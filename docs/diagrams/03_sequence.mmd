@@ -1,0 +1,83 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial", "fontSize": "14px", "actorBkg": "#D6E4E2", "actorTextColor": "#0F1E24", "actorBorder": "#0F1E24", "actorLineColor": "#6B8F94", "signalColor": "#0F1E24", "signalTextColor": "#0F1E24", "noteBkgColor": "#FCEFC7", "noteBorderColor": "#B98200", "noteTextColor": "#0F1E24", "labelBoxBkgColor": "#EEF3F2", "labelBoxBorderColor": "#1F6F73", "activationBkgColor": "#D6E4E2", "activationBorderColor": "#1F6F73", "sequenceNumberColor": "#FFFFFF"}}}%%
+%% INSE 6640 Group 8: Data flow as a sequence diagram
+%% One setup phase, the normal ingest-and-commit path, the positive control,
+%% two rejected attacks, one detected attack, and the boundary test.
+
+sequenceDiagram
+    autonumber
+    actor DEV as Developer (Foundry)
+    participant SIM as Meter simulator
+    participant AGG as Trusted aggregator
+    participant DB as SQLite utility DB
+    participant SC as MeterCommitmentRegistry (Anvil)
+    participant AUD as Auditor
+    actor ATK as Attacker (test harness)
+    participant LOG as Results log
+
+    rect rgb(238, 243, 242)
+        Note over DEV,SC: Phase 0: Setup
+        DEV->>SC: Deploy contract (forge script)
+        DEV->>SC: grantRole(AGGREGATOR_ROLE, aggregator account)
+    end
+
+    rect rgb(227, 241, 239)
+        Note over SIM,LOG: Phase 1: Ingest and commit (normal path)
+        SIM->>AGG: Reading: meter_id, interval_start, value, unit, seq
+        AGG->>AGG: Serialize in fixed field order
+        AGG->>AGG: recordKey = SHA-256(meter_id + interval_start)<br/>digest = SHA-256(canonical bytes)
+        AGG->>DB: INSERT record
+        AGG->>+SC: commit(recordKey, digest), signed by aggregator key
+        SC->>SC: Check AGGREGATOR_ROLE and that recordKey is unused
+        SC-->>-AGG: Receipt: event Committed, gasUsed, block time
+        AGG->>LOG: Submit latency and gasUsed
+    end
+
+    rect rgb(232, 245, 236)
+        Note over DB,LOG: Test 1: Positive control (clean record)
+        AUD->>DB: SELECT record by recordKey
+        DB-->>AUD: Stored record
+        AUD->>AUD: Recompute digest
+        AUD->>SC: getCommitment(recordKey)
+        SC-->>AUD: digest, committedAt, submitter
+        AUD->>LOG: VERIFIED (digests match), verify latency
+    end
+
+    rect rgb(251, 227, 222)
+        Note over DB,LOG: Attack A1: Post-commit tampering
+        ATK->>DB: UPDATE value from 5.2 to 25.2 kWh
+        AUD->>DB: SELECT record by recordKey
+        DB-->>AUD: Altered record
+        AUD->>AUD: Recompute digest (now different)
+        AUD->>SC: getCommitment(recordKey)
+        SC-->>AUD: Original digest
+        AUD->>LOG: TAMPERED (digests differ)
+    end
+
+    rect rgb(251, 227, 222)
+        Note over SC,LOG: Attack A2: Unauthorized submission
+        ATK->>SC: commit(recordKey, forged digest) from non-aggregator account
+        SC-->>ATK: Revert: AccessControlUnauthorizedAccount
+        ATK->>LOG: Rejected as expected
+    end
+
+    rect rgb(251, 227, 222)
+        Note over SC,LOG: Attack A3: Baseline overwrite (insider with aggregator key)
+        ATK->>SC: commit(existing recordKey, new digest)
+        SC-->>ATK: Revert: recordKey already committed
+        ATK->>LOG: Rejected as expected
+    end
+
+    rect rgb(252, 239, 199)
+        Note over SIM,LOG: Boundary test A4: Alteration before commitment
+        SIM->>ATK: Reading intercepted before the aggregator
+        ATK->>AGG: Altered reading (25.2 kWh)
+        AGG->>DB: INSERT altered record
+        AGG->>SC: commit(recordKey, digest of altered record)
+        SC-->>AGG: Receipt
+        AUD->>DB: SELECT record by recordKey
+        DB-->>AUD: Altered record
+        AUD->>SC: getCommitment(recordKey)
+        SC-->>AUD: Digest of altered record
+        AUD->>LOG: VERIFIED, a false negative by design
+        Note over AUD,LOG: Hashing proves no change after commitment,<br/>not that the input was true
+    end

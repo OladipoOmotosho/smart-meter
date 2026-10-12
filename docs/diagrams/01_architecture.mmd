@@ -1,0 +1,130 @@
+%%{init: {"layout": "elk", "elk": {"mergeEdges": false, "nodePlacementStrategy": "BRANDES_KOEPF"}, "theme": "base", "themeVariables": {"fontFamily": "Arial", "fontSize": "14px", "lineColor": "#3E5459", "primaryColor": "#EEF3F2", "primaryBorderColor": "#1F6F73", "primaryTextColor": "#0F1E24", "clusterBkg": "#FFFFFF", "clusterBorder": "#6B8F94"}}}%%
+%% INSE 6640 Group 8: System architecture
+%% Blockchain-Based Tamper Detection for Smart Meter Data
+%% Edit in Obsidian, VS Code (Mermaid preview), mermaid.live, or draw.io (Arrange > Insert > Advanced > Mermaid)
+%% Solid arrows = normal data path. Dashed arrows = attacks, extensions, tooling, context mapping.
+
+flowchart TB
+
+    subgraph AMI["Real-world AMI context (not built). Smart meter is modelled by the meter simulator; MDMS by the SQLite database"]
+        direction LR
+        RM["Smart meter"] --> DCN["Data concentrator"] --> HES["Head-end system"] --> MDMS["Utility MDMS"]
+    end
+
+    subgraph SRC["1. Data source layer"]
+        direction TB
+        DS[("AMPds2 dataset<br/>CSV, 1-minute household data")]
+        SIM["Meter simulator<br/>Python + pandas<br/>replays rows as meter readings:<br/>meter_id, interval_start, value, unit, seq"]
+        DS --> SIM
+    end
+
+    subgraph TRUST["2. Trusted aggregator (assumed trusted until the commitment is recorded)"]
+        direction TB
+        SER["Canonical serializer<br/>fixed field order and encoding:<br/>meter_id, interval_start, value, unit, seq"]
+        RKEY["Record key<br/>SHA-256 of meter_id + interval_start"]
+        HASH["Fingerprint<br/>SHA-256 of canonical bytes"]
+        BATCH["Batch builder (extension)<br/>one digest per interval"]
+        W3A["web3.py client<br/>signs transactions with the<br/>aggregator account key"]
+        SER --> RKEY
+        SER --> HASH
+        RKEY --> W3A
+        HASH --> W3A
+        HASH -.-> BATCH
+        BATCH -.-> W3A
+    end
+
+    subgraph OFF["3. Off-chain storage (untrusted: insider risk)"]
+        DB[("SQLite utility database<br/>table readings:<br/>record_id, meter_id, interval_start,<br/>value, unit, seq, stored_at")]
+    end
+
+    subgraph CHAIN["4. Blockchain layer: Anvil local Ethereum dev node (chain id 31337)"]
+        direction TB
+        SC["MeterCommitmentRegistry.sol<br/>Solidity smart contract"]
+        AC["OpenZeppelin AccessControl<br/>DEFAULT_ADMIN_ROLE<br/>AGGREGATOR_ROLE"]
+        FN["Functions<br/>commit(recordKey, digest): AGGREGATOR_ROLE only,<br/>reverts if recordKey already exists<br/>getCommitment(recordKey): read-only<br/>event Committed(recordKey, digest, submitter, time)"]
+        ST[("Contract storage<br/>recordKey maps to:<br/>digest, committedAt, submitter")]
+        SC --- AC
+        SC --- FN
+        FN --- ST
+    end
+
+    subgraph AUD["5. Auditor (Python + web3.py)"]
+        direction TB
+        RD["Read stored record<br/>from SQLite"]
+        RC["Re-serialize and<br/>recompute SHA-256"]
+        CMP{"Recomputed digest equals<br/>on-chain digest?"}
+        OK["VERIFIED"]
+        BAD["TAMPERED"]
+        MISS["MISSING commitment"]
+        RD --> RC --> CMP
+        CMP -->|yes| OK
+        CMP -->|no| BAD
+        CMP -->|no commitment found| MISS
+    end
+
+    subgraph EVAL["6. Evaluation"]
+        direction TB
+        LOG[("Results log, CSV / JSON<br/>verdicts, submit and verify latency,<br/>gasUsed per transaction")]
+        CH["matplotlib charts<br/>detection and false alarms,<br/>latency, gas per record vs batch"]
+        LOG --> CH
+    end
+
+    subgraph ATK["7. Test harness: attack and boundary scripts"]
+        direction TB
+        A1["A1 Post-commit tampering<br/>UPDATE a stored value"]
+        A2["A2 Unauthorized submission<br/>commit() from a non-aggregator account"]
+        A3["A3 Baseline overwrite<br/>commit() on an existing recordKey"]
+        A4["A4 Boundary test<br/>alter a value before it is committed"]
+    end
+
+    subgraph DEV["Tooling"]
+        FG["Foundry: forge build, test, deploy"]
+        GH["GitHub repository"]
+    end
+
+    %% Normal data path
+    SIM -->|reading tuple| SER
+    SER -->|INSERT record| DB
+    W3A -->|"signed tx: commit(recordKey, digest)"| SC
+    SC -->|"receipt: gasUsed, block, event"| LOG
+    DB -->|stored record| RD
+    ST -->|"getCommitment(recordKey)"| CMP
+    OK --> LOG
+    BAD --> LOG
+    MISS --> LOG
+
+    %% Attacks and boundary test
+    A1 -.->|edits stored row| DB
+    A2 -.->|reverted: AccessControlUnauthorizedAccount| SC
+    A3 -.->|reverted: already committed| SC
+    A4 -.->|altered before hashing| SIM
+
+    %% Tooling and context
+    FG -.->|deploy, grant AGGREGATOR_ROLE| SC
+    GH -.- FG
+
+    classDef ctx fill:#F4F6F6,stroke:#9AAEB1,color:#3E5459,stroke-dasharray: 4 3
+    classDef src fill:#D6E4E2,stroke:#1F6F73,color:#0F1E24
+    classDef trusted fill:#E3F1EF,stroke:#1F6F73,color:#0F1E24
+    classDef store fill:#FCEFC7,stroke:#B98200,color:#0F1E24
+    classDef chain fill:#1F6F73,stroke:#0F1E24,color:#FFFFFF
+    classDef audit fill:#EEF3F2,stroke:#3E5459,color:#0F1E24
+    classDef ok fill:#2E8B57,stroke:#1E5C3A,color:#FFFFFF
+    classDef bad fill:#C2452D,stroke:#7E2A1B,color:#FFFFFF
+    classDef warn fill:#F2A900,stroke:#9A6B00,color:#0F1E24
+    classDef attack fill:#FBE3DE,stroke:#C2452D,color:#7E2A1B
+    classDef ext fill:#FFFFFF,stroke:#B98200,color:#0F1E24,stroke-dasharray: 5 3
+    classDef tool fill:#FFFFFF,stroke:#6B8F94,color:#3E5459
+
+    class RM,DCN,HES,MDMS ctx
+    class DS,SIM src
+    class SER,RKEY,HASH,W3A trusted
+    class BATCH ext
+    class DB,LOG,ST store
+    class SC,AC,FN chain
+    class RD,RC,CMP,CH audit
+    class OK ok
+    class BAD bad
+    class MISS warn
+    class A1,A2,A3,A4 attack
+    class FG,GH tool

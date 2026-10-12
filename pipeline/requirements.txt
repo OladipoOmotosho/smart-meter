@@ -1,0 +1,5 @@
+web3>=7
+pandas>=2
+python-dotenv>=1
+matplotlib>=3.8
+pytest>=8

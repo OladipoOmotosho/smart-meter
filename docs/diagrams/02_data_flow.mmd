@@ -1,0 +1,69 @@
+%%{init: {"layout": "elk", "theme": "base", "themeVariables": {"fontFamily": "Arial", "fontSize": "14px", "lineColor": "#3E5459", "primaryColor": "#EEF3F2", "primaryBorderColor": "#1F6F73", "primaryTextColor": "#0F1E24", "clusterBkg": "#FFFFFF", "clusterBorder": "#6B8F94"}}}%%
+%% INSE 6640 Group 8: Data flow diagram
+%% Notation: rectangles = external entities, rounded boxes = processes (P),
+%% cylinders = data stores (D), dashed arrows = attack and boundary-test flows.
+
+flowchart TB
+
+    E1["E1 AMPds2 dataset<br/>(external source)"]
+    E2["E2 Auditor / analyst"]
+    E3["E3 Attacker<br/>(test harness)"]
+
+    subgraph TZ["Trust zone: trusted aggregator (until commitment)"]
+        direction LR
+        P1(["P1 Replay readings"])
+        P2(["P2 Canonicalize record"])
+        P3(["P3 Store record"])
+        P4(["P4 Compute fingerprint<br/>SHA-256"])
+        P5(["P5 Submit commitment<br/>signed transaction"])
+    end
+
+    subgraph RZ["Insider-risk zone: off-chain storage"]
+        D1[("D1 SQLite readings table")]
+    end
+
+    subgraph BZ["Integrity anchor: Anvil local node"]
+        D2[("D2 On-chain commitment registry<br/>recordKey: digest, committedAt, submitter")]
+    end
+
+    subgraph AZ["Audit and evaluation"]
+        direction LR
+        P6(["P6 Verify record"])
+        D3[("D3 Results log")]
+        P7(["P7 Measure and report"])
+    end
+
+    E1 -->|"raw rows: timestamp, measurement"| P1
+    P1 -->|"reading: meter_id, interval_start, value, unit, seq"| P2
+    P2 -->|record| P3
+    P3 -->|INSERT| D1
+    P2 -->|canonical bytes| P4
+    P4 -->|"recordKey + digest"| P5
+    P5 -->|"commit(recordKey, digest)"| D2
+    P5 -->|"receipt: gasUsed, submit latency"| D3
+
+    E2 -->|"audit request: recordKey"| P6
+    D1 -->|stored record| P6
+    D2 -->|"committed digest, committedAt, submitter"| P6
+    P6 -->|"verdict: VERIFIED / TAMPERED / MISSING,<br/>verify latency"| D3
+    P6 -->|verdict| E2
+    D3 -->|results| P7
+    P7 -->|"charts and tables"| E2
+
+    E3 -.->|"A1 UPDATE stored value (detected)"| D1
+    E3 -.->|"A2, A3 unauthorized or overwrite tx (reverted)"| D2
+    E3 -.->|"A4 alter reading before commit (not detected: boundary)"| P2
+
+    classDef ext fill:#0F1E24,stroke:#0F1E24,color:#FFFFFF
+    classDef proc fill:#E3F1EF,stroke:#1F6F73,color:#0F1E24
+    classDef store fill:#FCEFC7,stroke:#B98200,color:#0F1E24
+    classDef chain fill:#1F6F73,stroke:#0F1E24,color:#FFFFFF
+    classDef attacker fill:#C2452D,stroke:#7E2A1B,color:#FFFFFF
+
+    class E1,E2 ext
+    class E3 attacker
+    class P1,P2,P3,P4,P5,P6,P7 proc
+    class D1,D3 store
+    class D2 chain
+
+    linkStyle 15,16,17 stroke:#C2452D,stroke-width:2px
