@@ -3,9 +3,6 @@
 A blockchain-based prototype for detecting changes to stored smart meter
 readings using SHA-256 fingerprints and smart contracts.
 
-INSE 6640 (Smart Grids and Control System Security), Concordia University,
-Fall 2026. Group 8.
-
 ## How it works
 
 1. Household readings from the public AMPds2 dataset are replayed as meter readings.
