@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "source_schema": [
+    "unix_ts",
+    "V",
+    "I",
+    "f",
+    "DPF",
+    "APF",
+    "P",
+    "Pt",
+    "Q",
+    "Qt",
+    "S",
+    "St"
+  ],
+  "timestamp_unit": "Unix seconds UTC",
+  "power_unit": "W",
+  "interval_minutes": 60,
+  "energy_formula": "sum(P_W) / 60",
+  "rounding": "decimal ROUND_HALF_UP once per complete hour",
+  "cases": [
+    {
+      "file": "valid_60w_hour.csv",
+      "expected": [
+        {
+          "interval_start": "2022-01-01T00:00:00Z",
+          "sample_count": 60,
+          "imputed_count": 0,
+          "exact_wh": "60",
+          "rounded_wh": 60
+        }
+      ]
+    },
+    {
+      "file": "fractional_0_5w_hour.csv",
+      "expected": [
+        {
+          "interval_start": "2022-01-01T00:00:00Z",
+          "sample_count": 60,
+          "imputed_count": 0,
+          "sum_w_samples": "30",
+          "exact_wh": "1/2",
+          "rounded_wh": 1
+        }
+      ]
+    },
+    {
+      "file": "rounding_boundaries.csv",
+      "expected": [
+        {
+          "interval_start": "2022-01-01T00:00:00Z",
+          "sum_w_samples": "29",
+          "exact_wh": "29/60",
+          "rounded_wh": 0
+        },
+        {
+          "interval_start": "2022-01-01T01:00:00Z",
+          "sum_w_samples": "30",
+          "exact_wh": "1/2",
+          "rounded_wh": 1
+        },
+        {
+          "interval_start": "2022-01-01T02:00:00Z",
+          "sum_w_samples": "31",
+          "exact_wh": "31/60",
+          "rounded_wh": 1
+        }
+      ]
+    },
+    {
+      "file": "imputed_hour.csv",
+      "expected": [
+        {
+          "interval_start": "2022-01-01T00:00:00Z",
+          "sample_count": 60,
+          "imputed_count": 1,
+          "exact_wh": "60",
+          "rounded_wh": 60
+        }
+      ]
+    },
+    {
+      "file": "partial_edges.csv",
+      "expected": [
+        {
+          "interval_start": "2022-01-01T00:00:00Z",
+          "sample_count": 60,
+          "imputed_count": 0,
+          "exact_wh": "60",
+          "rounded_wh": 60
+        }
+      ],
+      "excluded_boundary_rows": 60,
+      "excluded_boundary_hours": 2
+    },
+    {
+      "file": "duplicate_timestamp.csv",
+      "reject": "duplicate timestamp 1640996400"
+    },
+    {
+      "file": "gap_hour.csv",
+      "reject": "internal gap at 1640997000 between complete surrounding hours"
+    },
+    {
+      "file": "out_of_order.csv",
+      "reject": "timestamp order reverses from 1640996460 to 1640996400"
+    },
+    {
+      "file": "negative_power.csv",
+      "reject": "unsupported negative P at timestamp 1640995920"
+    },
+    {
+      "file": "non_finite_power.csv",
+      "reject": "non-finite P at timestamp 1640995680"
+    },
+    {
+      "file": "missing_power.csv",
+      "reject": "missing P at timestamp 1640995740"
+    },
+    {
+      "file": "invalid_timestamp.csv",
+      "reject": "invalid unix_ts at source row 9"
+    },
+    {
+      "file": "wrong_schema.csv",
+      "reject": "header does not equal the WHE source schema"
+    },
+    {
+      "file": "empty.csv",
+      "reject": "no readings"
+    }
+  ]
+}

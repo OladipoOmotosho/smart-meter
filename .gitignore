@@ -73,6 +73,14 @@ Thumbs.db
 # ============================================
 # Local-only material
 # ============================================
+# Personal agent guidance, project specs and local backups
+/.agent/
+/spec/
+/AGENTS.md
+/CLAUDE.md
+/backup/
+/backups/
+
 # Starter kit for a different project (its README says it stays local)
 setup/
 documentation/internal/
