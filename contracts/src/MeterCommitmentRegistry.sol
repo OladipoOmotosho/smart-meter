@@ -15,18 +15,13 @@ contract MeterCommitmentRegistry is AccessControl {
 
     /// What is stored for each reading.
     struct Commitment {
-        bytes32 digest;      // SHA-256 of the canonical reading bytes
-        uint64 committedAt;  // block timestamp when it was committed
-        address submitter;   // account that committed it
+        bytes32 digest; // SHA-256 of the canonical reading bytes
+        uint64 committedAt; // block timestamp when it was committed
+        address submitter; // account that committed it
     }
 
     /// Emitted once for every successful commit.
-    event Committed(
-        bytes32 indexed recordKey,
-        bytes32 digest,
-        address indexed submitter,
-        uint64 committedAt
-    );
+    event Committed(bytes32 indexed recordKey, bytes32 digest, address indexed submitter, uint64 committedAt);
 
     /// A fingerprint already exists for this record key.
     error AlreadyCommitted(bytes32 recordKey);
@@ -48,7 +43,8 @@ contract MeterCommitmentRegistry is AccessControl {
     ///  - recordKey must not already have a commitment (AlreadyCommitted)
     ///  - store digest, block timestamp and msg.sender, then emit Committed
     function commit(bytes32 recordKey, bytes32 digest) external {
-        recordKey; digest; // remove this line when you implement the function
+        recordKey; // remove this line when you implement the function
+        digest;
         revert("TODO: Step 2");
     }
 

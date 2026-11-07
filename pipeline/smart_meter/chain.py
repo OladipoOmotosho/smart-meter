@@ -19,8 +19,8 @@ from web3.contract import Contract
 class TxResult:
     tx_hash: str
     gas_used: int
-    seconds: float      # wall-clock time from send to mined receipt
-    status: int         # 1 = success, 0 = reverted
+    seconds: float  # wall-clock time from send to mined receipt
+    status: int  # 1 = success, 0 = reverted
 
 
 def connect(rpc_url: str) -> Web3:
@@ -33,7 +33,9 @@ def connect(rpc_url: str) -> Web3:
 def load_contract(w3: Web3, address: str, artifact_path: Path) -> Contract:
     """Load the deployed registry using the ABI that `forge build` writes."""
     if not address:
-        raise ValueError("CONTRACT_ADDRESS is empty. Run `make deploy` and copy the address into .env")
+        raise ValueError(
+            "CONTRACT_ADDRESS is empty. Run `make deploy` and copy the address into .env"
+        )
     if not Path(artifact_path).exists():
         raise FileNotFoundError(f"{artifact_path} not found. Run `make build` first.")
     abi = json.loads(Path(artifact_path).read_text())["abi"]
@@ -52,11 +54,16 @@ def send_tx(w3: Web3, contract_fn, private_key: str) -> TxResult:
     """
     account = w3.eth.account.from_key(private_key)
     tx = contract_fn.build_transaction(
-        {"from": account.address, "nonce": w3.eth.get_transaction_count(account.address)}
+        {
+            "from": account.address,
+            "nonce": w3.eth.get_transaction_count(account.address),
+        }
     )
     signed = account.sign_transaction(tx)
     start = time.perf_counter()
     tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
     seconds = time.perf_counter() - start
-    return TxResult(tx_hash.hex(), int(receipt["gasUsed"]), seconds, int(receipt["status"]))
+    return TxResult(
+        tx_hash.hex(), int(receipt["gasUsed"]), seconds, int(receipt["status"])
+    )

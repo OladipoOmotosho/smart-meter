@@ -21,6 +21,11 @@ from web3.contract import Contract
 from .models import Verdict
 
 
-def verify(conn: sqlite3.Connection, contract: Contract, meter_id: str,
-           interval_start: str, results_path: Path | None = None) -> Verdict:
+def verify(
+    conn: sqlite3.Connection,
+    contract: Contract,
+    meter_id: str,
+    interval_start: str,
+    results_path: Path | None = None,
+) -> Verdict:
     raise NotImplementedError("Step 7 in docs/BUILD_GUIDE.md")

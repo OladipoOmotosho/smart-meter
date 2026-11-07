@@ -50,6 +50,8 @@ make coverage
 
 The project is still being implemented. `make check` includes the required integration target. `make test-integration` owns a temporary local Anvil process, attempts a fresh deployment, runs the chain-marked tests, and tears down its node; it fails when Anvil is unavailable or required tests are skipped. Task 6.3 will complete fixture ownership and deployment-context checks. Current scaffold tests fail or skip; a partial test run is not whole-project acceptance.
 
+Test reports are written to `.test-results/` (or `REPORT_DIR`). The report checks reject empty, skipped and expected-fail required cases, and the CI workflow requires separate Python, contract and integration jobs. Python runtime settings never load `.env` implicitly. New run files belong in `results/<run_id>/`; write settings require a dataset and throwaway aggregator key, while audit settings require no signing key. The safe run and audit CLI commands are still pending Task 9.1.
+
 For a manual local chain, `make chain` starts Anvil in the foreground on `127.0.0.1:8545`. `make deploy` uses the explicitly provided local `.env` and broadcasts to that node; use only throwaway Anvil accounts. The deployment script does not yet record the full deployment context required by the spec. `make demo` deliberately fails until Task 9.1 replaces the scaffold's database deletion. There is no routine reset command.
 
 ## Dataset

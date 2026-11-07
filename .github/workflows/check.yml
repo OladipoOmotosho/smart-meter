@@ -1,0 +1,85 @@
+name: check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -r pipeline/requirements.lock
+      - run: .venv/bin/python -m pip check
+      - run: .venv/bin/python -m ruff check --no-cache pipeline scripts
+      - run: .venv/bin/python -m ruff format --check pipeline scripts
+      - run: make test-unit
+      - run: make coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-results
+          path: .test-results/
+          if-no-files-found: warn
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.9.0
+      - run: sh scripts/install_contract_libs.sh
+      - run: cd contracts && forge fmt --check
+      - run: make build
+      - run: make test-contracts PY=python
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-results
+          path: .test-results/
+          if-no-files-found: warn
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.9.0
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install -r pipeline/requirements.lock
+      - run: sh scripts/install_contract_libs.sh
+      - run: make test-integration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results
+          path: .test-results/
+          if-no-files-found: warn
+
+  required-checks:
+    if: always()
+    needs: [python, contracts, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all three jobs
+        env:
+          PYTHON_RESULT: ${{ needs.python.result }}
+          CONTRACTS_RESULT: ${{ needs.contracts.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+        run: |
+          test "$PYTHON_RESULT" = success
+          test "$CONTRACTS_RESULT" = success
+          test "$INTEGRATION_RESULT" = success

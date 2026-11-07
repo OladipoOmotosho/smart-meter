@@ -1,8 +1,9 @@
 PYTHON ?= python3.12
-VENV := .venv
+VENV ?= .venv
 PY := $(abspath $(VENV))/bin/python
 FORGE ?= forge
 ANVIL ?= anvil
+REPORT_DIR ?= .test-results
 
 .PHONY: help install lint build test-unit test-contracts test-integration coverage check chain deploy demo
 
@@ -17,25 +18,33 @@ install:
 	@sh scripts/install_contract_libs.sh
 
 lint:
-	@$(PY) -m ruff check pipeline
-	@$(PY) -m ruff format --check pipeline
+	@$(PY) -m ruff check pipeline scripts
+	@$(PY) -m ruff format --check pipeline scripts
 	@cd contracts && $(FORGE) fmt --check
 
 build:
 	@cd contracts && $(FORGE) build
 
 test-unit:
-	@cd pipeline && $(PY) -m pytest -m 'not chain' -ra
+	@mkdir -p $(REPORT_DIR)
+	@cd pipeline && $(PY) -m pytest -m 'not chain' -ra -p no:cacheprovider --strict-markers --junitxml=$(abspath $(REPORT_DIR))/unit.xml
+	@$(PY) scripts/check_test_report.py unit $(REPORT_DIR)/unit.xml
 
 test-contracts:
-	@cd contracts && $(FORGE) test -vv
+	@mkdir -p $(REPORT_DIR)
+	@cd contracts && $(FORGE) test -vv > $(abspath $(REPORT_DIR))/contracts.txt 2>&1 || { cat $(abspath $(REPORT_DIR))/contracts.txt; exit 1; }
+	@cat $(REPORT_DIR)/contracts.txt
+	@$(PY) scripts/check_test_report.py contracts $(REPORT_DIR)/contracts.txt
 
 test-integration:
-	@$(PY) scripts/run_integration.py
+	@mkdir -p $(REPORT_DIR)
+	@$(PY) scripts/run_integration.py $(abspath $(REPORT_DIR))/integration.xml
+	@$(PY) scripts/check_test_report.py chain $(REPORT_DIR)/integration.xml
 
 coverage:
-	@cd pipeline && $(PY) -m coverage run -m pytest -m 'not chain' -ra
-	@cd pipeline && $(PY) -m coverage report --fail-under=85
+	@cd pipeline && $(PY) -m coverage run --branch -m pytest -m 'not chain' -ra -p no:cacheprovider --strict-markers
+	@cd pipeline && $(PY) -m coverage report
+	@$(PY) scripts/check_branch_coverage.py pipeline/.coverage
 
 check: lint build test-unit test-contracts test-integration coverage
 

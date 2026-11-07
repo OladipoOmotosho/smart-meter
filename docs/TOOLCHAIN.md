@@ -1,6 +1,6 @@
 # Pinned development toolchain
 
-Task 2.1 records the versions used to prepare the reproducible project setup. Task 2.2 adds the Makefile commands; the isolated test harness and clean-checkout gate remain Tasks 2.3–2.5.
+Task 2.1 records the versions used to prepare the reproducible project setup. Tasks 2.2–2.4 add the commands, isolated configuration and check harness; the clean-checkout gate remains Task 2.5.
 
 | Component | Pin | Source |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Task 2.1 records the versions used to prepare the reproducible project setup. Ta
 | OpenZeppelin Contracts | `v5.4.0`, Git commit `c64a1edb67b6e3f4a15cca8909c9482ad33a02b0` | [release](https://github.com/OpenZeppelin/openzeppelin-contracts/releases/tag/v5.4.0) |
 | forge-std | `v1.16.2`, Git commit `bf647bd6046f2f7da30d0c2bf435e5c76a780c1b` | [release](https://github.com/foundry-rs/forge-std/releases/tag/v1.16.2) |
 
-The Git commit IDs above were verified against upstream release tags on 2026-11-06. The repository currently has no installed `contracts/lib/` directory and `forge`/`anvil` are not on PATH in the inspected environment; listing pins is not a claim that contract builds pass.
+The Git commit IDs above were verified against upstream release tags on 2026-11-06. Foundry v1.9.0 was installed in `~/.local/bin` on macOS arm64 from the [official release archive](https://github.com/foundry-rs/foundry/releases/download/v1.9.0/foundry_v1.9.0_darwin_arm64.tar.gz), verified with SHA-256 `38f9af72b266c38ce2e4dfc659ae9cbd1f78c01b34738a76b6c4cb9610579426`. Both `anvil --version` and `forge --version` report commit `6056c5845d34205a83cf7108042adb137325c9df`; an owned disposable Anvil process returned JSON-RPC chain ID `0x7a69` and was stopped. On 2026-11-06, `scripts/install_contract_libs.sh` installed both libraries under ignored `contracts/lib/` and verified their exact commits. `make build` compiled 28 files successfully with solc 0.8.24; the remaining mutability warnings come from unfinished registry methods. `make test-contracts` reached all seven scaffold tests, which are still explicitly skipped, so its report gate correctly fails.
 
 ## Installation method
 

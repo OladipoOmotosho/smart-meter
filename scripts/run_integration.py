@@ -16,7 +16,6 @@ from pathlib import Path
 
 from eth_account import Account
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEV_MNEMONIC = "test test test test test test test test test test test junk"
 
@@ -30,7 +29,9 @@ def available_port() -> int:
 def ready(rpc_url: str) -> bool:
     request = urllib.request.Request(
         rpc_url,
-        data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []}).encode(),
+        data=json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []}
+        ).encode(),
         headers={"Content-Type": "application/json"},
     )
     try:
@@ -40,7 +41,7 @@ def ready(rpc_url: str) -> bool:
         return False
 
 
-def main() -> int:
+def main(report_path: Path) -> int:
     """Start, deploy, test, and stop only this command's local chain."""
     python = Path(sys.executable)
     port = available_port()
@@ -60,17 +61,25 @@ def main() -> int:
             "AGGREGATOR_ADDRESS": accounts[1].address,
             "AGGREGATOR_PRIVATE_KEY": accounts[1].key.hex(),
             "ATTACKER_PRIVATE_KEY": accounts[2].key.hex(),
-            "DATASET_PATH": str(ROOT / "pipeline" / "tests" / "fixtures" / "valid_60w_hour.csv"),
-            "DB_PATH": str(temp / "readings.sqlite"),
-            "RESULTS_PATH": str(temp / "results.csv"),
+            "DATASET_PATH": str(
+                ROOT / "pipeline" / "tests" / "fixtures" / "valid_60w_hour.csv"
+            ),
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
         }
         try:
             with (temp / "anvil.log").open("wb") as log:
                 node = subprocess.Popen(
-                    ["anvil", "--host", "127.0.0.1", "--port", str(port),
-                     "--mnemonic", DEV_MNEMONIC, "--silent"],
+                    [
+                        "anvil",
+                        "--host",
+                        "127.0.0.1",
+                        "--port",
+                        str(port),
+                        "--mnemonic",
+                        DEV_MNEMONIC,
+                        "--silent",
+                    ],
                     cwd=temp,
                     env=env,
                     stdout=log,
@@ -83,24 +92,54 @@ def main() -> int:
                             break
                         time.sleep(0.1)
                     else:
-                        raise RuntimeError("owned Anvil did not become ready within 15 seconds")
+                        raise RuntimeError(
+                            "owned Anvil did not become ready within 15 seconds"
+                        )
 
                     subprocess.run(
-                        ["forge", "script", "script/Deploy.s.sol:Deploy", "--rpc-url",
-                         rpc_url, "--broadcast"],
-                        cwd=ROOT / "contracts", env=env, check=True,
+                        [
+                            "forge",
+                            "script",
+                            "script/Deploy.s.sol:Deploy",
+                            "--rpc-url",
+                            rpc_url,
+                            "--broadcast",
+                        ],
+                        cwd=ROOT / "contracts",
+                        env=env,
+                        check=True,
                     )
                     result = subprocess.run(
-                        [str(python), "-m", "pytest", "-m", "chain", "-ra", "-p", "no:cacheprovider"],
-                        cwd=ROOT / "pipeline", env=env, check=False,
-                        capture_output=True, text=True,
+                        [
+                            str(python),
+                            "-m",
+                            "pytest",
+                            "-m",
+                            "chain",
+                            "-ra",
+                            "--strict-markers",
+                            "--junitxml",
+                            str(report_path),
+                            "-p",
+                            "no:cacheprovider",
+                        ],
+                        cwd=ROOT / "pipeline",
+                        env=env,
+                        check=False,
+                        capture_output=True,
+                        text=True,
                     )
                     output = result.stdout + result.stderr
                     print(output, end="")
                     if result.returncode:
                         return result.returncode
-                    if re.search(r"\b\d+ skipped\b|\b\d+ xfailed\b|\bno tests ran\b", output):
-                        print("Required integration tests were skipped, xfailed, or absent.", file=sys.stderr)
+                    if re.search(
+                        r"\b\d+ skipped\b|\b\d+ xfailed\b|\bno tests ran\b", output
+                    ):
+                        print(
+                            "Required integration tests were skipped, xfailed, or absent.",
+                            file=sys.stderr,
+                        )
                         return 1
                     return 0
                 finally:
@@ -119,4 +158,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: run_integration.py REPORT_PATH")
+    raise SystemExit(main(Path(sys.argv[1])))

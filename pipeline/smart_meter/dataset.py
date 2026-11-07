@@ -20,8 +20,12 @@ from pathlib import Path
 from .models import Reading
 
 
-def load_readings(path: Path, meter_id: str = "AMPDS2-WHE",
-                  interval_minutes: int = 60, limit: int | None = None) -> Iterator[Reading]:
+def load_readings(
+    path: Path,
+    meter_id: str = "AMPDS2-WHE",
+    interval_minutes: int = 60,
+    limit: int | None = None,
+) -> Iterator[Reading]:
     """Yield one Reading per interval, oldest first, with seq = 0, 1, 2, ...
 
     interval_start must be ISO 8601 UTC, e.g. "2012-04-01T00:00:00Z".

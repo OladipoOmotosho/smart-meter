@@ -44,7 +44,9 @@ def insert_reading(conn: sqlite3.Connection, r: Reading) -> int:
     return int(cur.lastrowid)
 
 
-def get_reading(conn: sqlite3.Connection, meter_id: str, interval_start: str) -> Reading | None:
+def get_reading(
+    conn: sqlite3.Connection, meter_id: str, interval_start: str
+) -> Reading | None:
     """Read back one stored reading, exactly as the database holds it now."""
     row = conn.execute(
         "SELECT meter_id, interval_start, value_wh, unit, seq FROM readings "
@@ -53,10 +55,18 @@ def get_reading(conn: sqlite3.Connection, meter_id: str, interval_start: str) ->
     ).fetchone()
     if row is None:
         return None
-    return Reading(row["meter_id"], row["interval_start"], int(row["value_wh"]), row["unit"], int(row["seq"]))
+    return Reading(
+        row["meter_id"],
+        row["interval_start"],
+        int(row["value_wh"]),
+        row["unit"],
+        int(row["seq"]),
+    )
 
 
 def all_keys(conn: sqlite3.Connection) -> list[tuple[str, str]]:
     """Every (meter_id, interval_start) pair in storage order."""
-    rows = conn.execute("SELECT meter_id, interval_start FROM readings ORDER BY record_id").fetchall()
+    rows = conn.execute(
+        "SELECT meter_id, interval_start FROM readings ORDER BY record_id"
+    ).fetchall()
     return [(row["meter_id"], row["interval_start"]) for row in rows]

@@ -22,7 +22,13 @@ from web3.contract import Contract
 from .models import Reading
 
 
-def ingest(readings: Iterable[Reading], conn: sqlite3.Connection, w3: Web3,
-           contract: Contract, aggregator_key: str, results_path: Path) -> int:
+def ingest(
+    readings: Iterable[Reading],
+    conn: sqlite3.Connection,
+    w3: Web3,
+    contract: Contract,
+    aggregator_key: str,
+    results_path: Path,
+) -> int:
     """Store and commit every reading. Return how many were committed."""
     raise NotImplementedError("Step 6 in docs/BUILD_GUIDE.md")
