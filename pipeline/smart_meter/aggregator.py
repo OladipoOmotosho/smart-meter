@@ -1,25 +1,25 @@
-"""Trusted aggregator: store, fingerprint, commit. [YOU WRITE THIS: Step 6]
-
-For each reading, in this order:
-  1. insert it into the database (db.insert_reading)
-  2. compute its record key and digest (fingerprint module)
-  3. commit both to the contract, signed by the aggregator key (chain.send_tx)
-  4. log the gas used and the time taken (results.log, event="commit")
-
-Think about: what should happen if step 3 fails after step 1 succeeded?
-Note your answer in the report; the simple choice is fine for a prototype.
-"""
+"""Store a reading, commit its digest, and verify confirmation."""
 
 from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from web3 import Web3
 from web3.contract import Contract
 
+from . import chain, db, results
+from .fingerprint import digest, record_key
 from .models import Reading
+
+
+@dataclass(frozen=True)
+class IngestSummary:
+    attempted: int
+    newly_confirmed: int
+    reconciled: int
 
 
 def ingest(
@@ -29,6 +29,40 @@ def ingest(
     contract: Contract,
     aggregator_key: str,
     results_path: Path,
-) -> int:
-    """Store and commit every reading. Return how many were committed."""
-    raise NotImplementedError("Step 6 in docs/BUILD_GUIDE.md")
+) -> IngestSummary:
+    """Commit in order; an identical existing anchor is reconciled without a write."""
+    attempted = newly_confirmed = reconciled = 0
+    for reading in readings:
+        attempted += 1
+        if reading.unit != "Wh" or not reading.interval_start.endswith(":00:00Z"):
+            raise ValueError("ingestion requires an hourly UTC Wh reading")
+        key = record_key(reading.meter_id, reading.interval_start)
+        expected = digest(reading)
+        existing = db.get_reading(conn, reading.meter_id, reading.interval_start)
+        if existing is not None and existing != reading:
+            raise ValueError(f"conflicting stored reading for {key.hex()}")
+        if existing is None:
+            db.insert_reading(conn, reading)
+        stored = contract.functions.getCommitment(key).call()
+        if stored[0] != bytes(32):
+            if stored[0] != expected:
+                raise ValueError(f"conflicting registry digest for {key.hex()}")
+            reconciled += 1
+            continue
+        tx = chain.send_tx(w3, contract.functions.commit(key, expected), aggregator_key)
+        if tx.status != 1:
+            raise ValueError(f"transaction reverted: {tx.tx_hash}")
+        confirmed = contract.functions.getCommitment(key).call()
+        if confirmed[0] != expected:
+            raise ValueError(f"registry confirmation mismatch for {key.hex()}")
+        newly_confirmed += 1
+        results.log(
+            results_path,
+            "commit",
+            reading.meter_id,
+            reading.interval_start,
+            gas_used=tx.gas_used,
+            seconds=tx.seconds,
+            note=tx.tx_hash,
+        )
+    return IngestSummary(attempted, newly_confirmed, reconciled)

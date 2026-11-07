@@ -32,6 +32,11 @@ def test_literal_versioned_bytes_and_hashes():
     assert record_key(BASE.meter_id, BASE.interval_start).hex() == VECTOR["key_hex"]
 
 
+def test_non_reading_object_is_rejected():
+    with pytest.raises(TypeError, match="Reading"):
+        canonical_bytes({"meter_id": "M1"})
+
+
 @pytest.mark.parametrize(
     ("change", "error"),
     [
