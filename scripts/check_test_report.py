@@ -18,6 +18,7 @@ REQUIRED_SCENARIO_PREFIXES = {
     scenario: f"test_{scenario}_" for scenario in ("S5", "S6", "S7", "S8", "S9", "S10")
 }
 REQUIRED_CONTRACT = {
+    "testFuzz_FirstCommitRemainsFixed",
     "test_AggregatorCanCommit",
     "test_GetCommitmentReturnsStoredValues",
     "test_UnknownKeyIsEmpty",
@@ -55,7 +56,10 @@ def check_junit(path: Path, suite: str) -> list[str]:
 
 def check_contracts(path: Path) -> list[str]:
     output = path.read_text()
-    matches = re.findall(r"\[(PASS|FAIL|SKIP)(?::[^\]]+)?\]\s+(test_\w+)\(", output)
+    matches = re.findall(
+        r"\[(PASS|FAIL|SKIP)(?::[^\]]+)?\]\s+(test(?:_|Fuzz|Invariant)\w+)\(",
+        output,
+    )
     names = {name for _, name in matches}
     problems = [] if matches else ["no contract tests reported"]
     for name in sorted(REQUIRED_CONTRACT - names):

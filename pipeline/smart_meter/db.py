@@ -55,12 +55,18 @@ def get_reading(
     ).fetchone()
     if row is None:
         return None
+    for column in ("meter_id", "interval_start", "unit"):
+        if not isinstance(row[column], str):
+            raise TypeError(f"stored {column} must be text")
+    for column in ("value_wh", "seq"):
+        if type(row[column]) is not int:
+            raise TypeError(f"stored {column} must be an integer")
     return Reading(
         row["meter_id"],
         row["interval_start"],
-        int(row["value_wh"]),
+        row["value_wh"],
         row["unit"],
-        int(row["seq"]),
+        row["seq"],
     )
 
 

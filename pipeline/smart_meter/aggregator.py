@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from web3 import Web3
@@ -22,6 +23,25 @@ class IngestSummary:
     reconciled: int
 
 
+def _validate_reading(reading: Reading) -> None:
+    if not isinstance(reading.meter_id, str) or not reading.meter_id.strip():
+        raise ValueError("ingestion requires a valid meter ID")
+    try:
+        parsed = datetime.strptime(reading.interval_start, "%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "ingestion requires a canonical hourly UTC timestamp"
+        ) from error
+    if (
+        parsed.minute != 0
+        or parsed.second != 0
+        or parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != reading.interval_start
+    ):
+        raise ValueError("ingestion requires a canonical hourly UTC timestamp")
+    if reading.unit != "Wh":
+        raise ValueError("ingestion requires an hourly UTC Wh reading")
+
+
 def ingest(
     readings: Iterable[Reading],
     conn: sqlite3.Connection,
@@ -34,8 +54,7 @@ def ingest(
     attempted = newly_confirmed = reconciled = 0
     for reading in readings:
         attempted += 1
-        if reading.unit != "Wh" or not reading.interval_start.endswith(":00:00Z"):
-            raise ValueError("ingestion requires an hourly UTC Wh reading")
+        _validate_reading(reading)
         key = record_key(reading.meter_id, reading.interval_start)
         expected = digest(reading)
         existing = db.get_reading(conn, reading.meter_id, reading.interval_start)
