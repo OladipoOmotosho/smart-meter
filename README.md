@@ -48,7 +48,7 @@ make test-contracts
 make coverage
 ```
 
-The project is still being implemented. `make check` includes the required integration target. `make test-integration` owns a temporary local Anvil process, attempts a fresh deployment, runs the chain-marked tests, and tears down its node; it fails when Anvil is unavailable or required tests are skipped. Task 6.3 will complete fixture ownership and deployment-context checks. Current scaffold tests fail or skip; a partial test run is not whole-project acceptance.
+The project is still being implemented. `make check` includes the required integration target. `make test-integration` owns a temporary local Anvil process, builds the contract, deploys a fresh registry per scenario, runs the chain-marked tests, and tears down its node. The checks now exercise the implemented loader, registry, basic ingestion and audit paths; a passing check does not complete the remaining manifest, journal, deployment-context, evaluation and safe demo tasks in the private project spec.
 
 Test reports are written to `.test-results/` (or `REPORT_DIR`). The report checks reject empty, skipped and expected-fail required cases, and the CI workflow requires separate Python, contract and integration jobs. Python runtime settings never load `.env` implicitly. New run files belong in `results/<run_id>/`; write settings require a dataset and throwaway aggregator key, while audit settings require no signing key. The safe run and audit CLI commands are still pending Task 9.1.
 

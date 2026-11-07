@@ -57,10 +57,10 @@ def main(report_path: Path) -> int:
             "PATH": os.environ.get("PATH", ""),
             "HOME": str(temp),
             "RPC_URL": rpc_url,
-            "ADMIN_PRIVATE_KEY": accounts[0].key.hex(),
+            "ADMIN_PRIVATE_KEY": "0x" + accounts[0].key.hex(),
             "AGGREGATOR_ADDRESS": accounts[1].address,
-            "AGGREGATOR_PRIVATE_KEY": accounts[1].key.hex(),
-            "ATTACKER_PRIVATE_KEY": accounts[2].key.hex(),
+            "AGGREGATOR_PRIVATE_KEY": "0x" + accounts[1].key.hex(),
+            "ATTACKER_PRIVATE_KEY": "0x" + accounts[2].key.hex(),
             "DATASET_PATH": str(
                 ROOT / "pipeline" / "tests" / "fixtures" / "valid_60w_hour.csv"
             ),
@@ -97,14 +97,7 @@ def main(report_path: Path) -> int:
                         )
 
                     subprocess.run(
-                        [
-                            "forge",
-                            "script",
-                            "script/Deploy.s.sol:Deploy",
-                            "--rpc-url",
-                            rpc_url,
-                            "--broadcast",
-                        ],
+                        ["forge", "build"],
                         cwd=ROOT / "contracts",
                         env=env,
                         check=True,
