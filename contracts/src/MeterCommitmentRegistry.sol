@@ -2,13 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// @title MeterCommitmentRegistry
 /// @notice Stores one fingerprint (a SHA-256 digest) per meter reading.
 ///         A fingerprint can be added once and never replaced.
-/// @dev SPEC ONLY. The signatures, events and errors below are the agreed
-///      interface. You write the storage and the function bodies.
-///      See docs/BUILD_GUIDE.md, Step 2.
+/// @dev The registry checks write authority and preserves the first digest.
 contract MeterCommitmentRegistry is AccessControl {
     /// Accounts with this role may commit fingerprints.
     bytes32 public constant AGGREGATOR_ROLE = keccak256("AGGREGATOR_ROLE");
@@ -26,13 +25,15 @@ contract MeterCommitmentRegistry is AccessControl {
     /// A fingerprint already exists for this record key.
     error AlreadyCommitted(bytes32 recordKey);
 
-    /// The digest is all zeros, which is never a real SHA-256 output here.
+    /// The zero digest is excluded by this registry's API convention.
     error ZeroDigest();
+    error InvalidAdmin();
 
-    // TODO(Step 2): declare the storage that maps a record key to its Commitment.
+    mapping(bytes32 => Commitment) private commitments;
 
     /// @param admin account that receives DEFAULT_ADMIN_ROLE and can grant AGGREGATOR_ROLE
     constructor(address admin) {
+        if (admin == address(0)) revert InvalidAdmin();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
 
@@ -42,21 +43,21 @@ contract MeterCommitmentRegistry is AccessControl {
     ///  - digest must not be zero (ZeroDigest)
     ///  - recordKey must not already have a commitment (AlreadyCommitted)
     ///  - store digest, block timestamp and msg.sender, then emit Committed
-    function commit(bytes32 recordKey, bytes32 digest) external {
-        recordKey; // remove this line when you implement the function
-        digest;
-        revert("TODO: Step 2");
+    function commit(bytes32 recordKey, bytes32 digest) external onlyRole(AGGREGATOR_ROLE) {
+        if (digest == bytes32(0)) revert ZeroDigest();
+        if (commitments[recordKey].digest != bytes32(0)) revert AlreadyCommitted(recordKey);
+        uint64 committedAt = SafeCast.toUint64(block.timestamp);
+        commitments[recordKey] = Commitment(digest, committedAt, msg.sender);
+        emit Committed(recordKey, digest, msg.sender, committedAt);
     }
 
     /// @notice Return the stored commitment. All fields are zero if none exists.
     function getCommitment(bytes32 recordKey) external view returns (Commitment memory) {
-        recordKey; // remove this line when you implement the function
-        revert("TODO: Step 2");
+        return commitments[recordKey];
     }
 
     /// @notice True if a fingerprint has been committed for this record key.
     function isCommitted(bytes32 recordKey) external view returns (bool) {
-        recordKey; // remove this line when you implement the function
-        revert("TODO: Step 2");
+        return commitments[recordKey].digest != bytes32(0);
     }
 }
