@@ -34,20 +34,25 @@ docs/                     diagrams
 data/                     dataset and generated database (not committed)
 ```
 
-## Quick start
+## Current setup and checks
 
-Requires Foundry and Python 3.11+.
+Use Python 3.12 and [Foundry v1.9.0](https://github.com/foundry-rs/foundry/releases/tag/v1.9.0). The exact contract-library revisions and update method are in [the toolchain guide](docs/TOOLCHAIN.md). Install Foundry first; `make install` creates `.venv`, installs the exact Python lock and checks out the pinned Solidity libraries. It does not install the Foundry binaries themselves.
 
 ```bash
-make install          # contract libraries + Python environment
-cp .env.example .env  # then fill it in from the Anvil account list
-make chain            # in a separate terminal; leave running
+make help
+make install
+make lint
 make build
+make test-unit
 make test-contracts
-make deploy           # copy the printed address into .env
-make test-pipeline
-make demo
+make coverage
 ```
+
+The project is still being implemented. `make check` includes the required integration target. `make test-integration` owns a temporary local Anvil process, builds the contract, deploys a fresh registry per scenario, runs the chain-marked tests, and tears down its node. The checks now exercise the implemented loader, registry, basic ingestion and audit paths; a passing check does not complete the remaining manifest, journal, deployment-context, evaluation and safe demo tasks in the private project spec.
+
+Test reports are written to `.test-results/` (or `REPORT_DIR`). The report checks reject empty, skipped and expected-fail required cases, and the CI workflow requires separate Python, contract and integration jobs. Python runtime settings never load `.env` implicitly. New run files belong in `results/<run_id>/`; write settings require a dataset and throwaway aggregator key, while audit settings require no signing key. The safe run and audit CLI commands are still pending Task 9.1.
+
+For a manual local chain, `make chain` starts Anvil in the foreground on `127.0.0.1:8545`. `make deploy` uses the explicitly provided local `.env` and broadcasts to that node; use only throwaway Anvil accounts. The deployment script does not yet record the full deployment context required by the spec. `make demo` deliberately fails until Task 9.1 replaces the scaffold's database deletion. There is no routine reset command.
 
 ## Dataset
 

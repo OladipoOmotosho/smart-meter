@@ -6,10 +6,10 @@ import csv
 import hashlib
 import json
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from fractions import Fraction
+from itertools import pairwise
 from pathlib import Path
-
 
 FIXTURE_DIR = Path(__file__).resolve().parent
 REPOSITORY_ROOT = FIXTURE_DIR.parents[2]
@@ -63,8 +63,7 @@ def validate_expected_case(case: dict[str, object]) -> None:
 
     timestamps = [numeric_timestamp(row["unix_ts"]) for row in rows]
     assert all(
-        current - previous == 60
-        for previous, current in zip(timestamps, timestamps[1:])
+        current - previous == 60 for previous, current in pairwise(timestamps)
     ), name
 
     hours: dict[int, list[dict[str, str]]] = defaultdict(list)
@@ -81,21 +80,19 @@ def validate_expected_case(case: dict[str, object]) -> None:
     assert len(complete_hours) == len(expected), name
     for (hour, hour_rows), interval in zip(complete_hours, expected):
         assert isinstance(interval, dict)
-        interval_start = datetime.fromtimestamp(hour, timezone.utc).strftime(
+        interval_start = datetime.fromtimestamp(hour, UTC).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
         assert interval_start == interval["interval_start"], name
-        energy_wh = sum(
-            (Fraction(row["P"]) for row in hour_rows), start=Fraction()
-        ) / 60
+        energy_wh = (
+            sum((Fraction(row["P"]) for row in hour_rows), start=Fraction()) / 60
+        )
         assert energy_wh == Fraction(str(interval["exact_wh"])), name
         assert round_half_up(energy_wh) == interval["rounded_wh"], name
         if "sample_count" in interval:
             assert len(hour_rows) == interval["sample_count"], name
         if "imputed_count" in interval:
-            imputed_count = sum(
-                row["unix_ts"].startswith("+") for row in hour_rows
-            )
+            imputed_count = sum(row["unix_ts"].startswith("+") for row in hour_rows)
             assert imputed_count == interval["imputed_count"], name
 
     if "excluded_boundary_rows" in case:
@@ -124,14 +121,14 @@ def validate_rejection_case(case: dict[str, object]) -> None:
         assert list(counts.values()) == [60, 59, 60]
         assert [
             current - previous
-            for previous, current in zip(timestamps, timestamps[1:])
+            for previous, current in pairwise(timestamps)
             if current - previous != 60
         ] == [120]
     elif name == "out_of_order.csv":
         timestamps = [numeric_timestamp(row["unix_ts"]) for row in rows]
         reversals = [
             (previous, current)
-            for previous, current in zip(timestamps, timestamps[1:])
+            for previous, current in pairwise(timestamps)
             if current < previous
         ]
         assert reversals == [(1640996460, 1640996400)]
@@ -175,9 +172,7 @@ def validate_sources() -> None:
         assert sha256(raw_dir / name) == expected_hash, name
 
     selected_rows: list[dict[str, str]] = []
-    with (raw_dir / "Electricity_WHE.csv").open(
-        newline="", encoding="utf-8"
-    ) as handle:
+    with (raw_dir / "Electricity_WHE.csv").open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         assert reader.fieldnames == SOURCE_HEADER
         for row in reader:
@@ -192,12 +187,12 @@ def validate_sources() -> None:
     assert timestamps == list(range(1333263600, 1333350000, 60))
     assert all(not row["unix_ts"].startswith("+") for row in selected_rows)
     assert all(Fraction(row["P"]) >= 0 for row in selected_rows)
-    first_hour_wh = sum(
-        (Fraction(row["P"]) for row in selected_rows[:60]), start=Fraction()
-    ) / 60
-    full_window_wh = sum(
-        (Fraction(row["P"]) for row in selected_rows), start=Fraction()
-    ) / 60
+    first_hour_wh = (
+        sum((Fraction(row["P"]) for row in selected_rows[:60]), start=Fraction()) / 60
+    )
+    full_window_wh = (
+        sum((Fraction(row["P"]) for row in selected_rows), start=Fraction()) / 60
+    )
     assert first_hour_wh == Fraction(96515, 60)
     assert round_half_up(first_hour_wh) == 1609
     assert full_window_wh == Fraction(383527, 10)

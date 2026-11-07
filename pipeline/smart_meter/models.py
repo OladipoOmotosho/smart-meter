@@ -14,14 +14,27 @@ from enum import Enum
 
 @dataclass(frozen=True)
 class Reading:
-    meter_id: str        # e.g. "AMPDS2-WHE"
+    meter_id: str  # e.g. "AMPDS2-WHE"
     interval_start: str  # ISO 8601 UTC, e.g. "2012-04-01T00:00:00Z"
-    value_wh: int        # energy used in the interval, in watt-hours
+    value_wh: int  # energy used in the interval, in watt-hours
     unit: str = "Wh"
-    seq: int = 0         # position of the reading in the replayed stream
+    seq: int = 0  # position of the reading in the replayed stream
 
 
 class Verdict(str, Enum):
-    VERIFIED = "VERIFIED"    # stored reading matches its on-chain fingerprint
-    TAMPERED = "TAMPERED"    # fingerprint exists but no longer matches
-    MISSING = "MISSING"      # no fingerprint was ever committed for this key
+    VERIFIED = "VERIFIED"  # stored reading matches its on-chain fingerprint
+    TAMPERED = "TAMPERED"  # fingerprint exists but no longer matches
+    MISSING_COMMITMENT = "MISSING_COMMITMENT"
+    MISSING_RECORD = "MISSING_RECORD"
+    MISSING_BOTH = "MISSING_BOTH"
+    ERROR = "ERROR"
+
+
+@dataclass(frozen=True)
+class AuditResult:
+    outcome: Verdict
+    reason: str
+    record_key: str
+    observed_digest: str | None
+    committed_digest: str | None
+    seconds: float

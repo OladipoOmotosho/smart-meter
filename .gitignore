@@ -30,6 +30,7 @@ htmlcov/
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+contracts/lib/
 
 # ============================================
 # Data, databases and results
@@ -93,3 +94,4 @@ docs/BUILD_GUIDE.md
 # The reading guide stays tracked.
 docs/**/*.pdf
 docs/**/*.csv
+.test-results/

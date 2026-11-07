@@ -1,0 +1,6 @@
+[run]
+source = smart_meter
+branch = True
+
+[report]
+show_missing = True

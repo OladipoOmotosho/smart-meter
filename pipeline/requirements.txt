@@ -1,5 +1,8 @@
-web3>=7
-pandas>=2
-python-dotenv>=1
-matplotlib>=3.8
-pytest>=8
+# Direct dependencies for Python 3.12; install the complete pinned set from
+# requirements.lock. Regenerate the lock only during a reviewed update.
+web3==7.16.0
+python-dotenv==1.2.1
+pytest==8.4.2
+hypothesis==6.170.15
+coverage==7.11.0
+ruff==0.17.4
