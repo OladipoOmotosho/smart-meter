@@ -1,0 +1,13 @@
+{
+  "reading": {
+    "meter_id": "AMPDS2-WHE",
+    "interval_start": "2012-04-01T00:00:00Z",
+    "value_wh": 5200,
+    "unit": "Wh",
+    "seq": 0
+  },
+  "canonical_ascii": "[\"smart-meter/reading/v1\",\"AMPDS2-WHE\",\"2012-04-01T00:00:00Z\",5200,\"Wh\",0]",
+  "digest_hex": "df24e5ad3230da400dd221c82c8fdd732b192cf740d0d78fd131067b6f9a14ad",
+  "identity_ascii": "[\"smart-meter/key/v1\",\"AMPDS2-WHE\",\"2012-04-01T00:00:00Z\"]",
+  "key_hex": "2f880b6d151c322d7d89a4495927c13a594c9272486148068f4dba93a515d038"
+}

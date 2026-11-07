@@ -5,7 +5,13 @@ from dataclasses import replace
 from smart_meter.fingerprint import canonical_bytes, digest, record_key
 from smart_meter.models import Reading
 
-BASE = Reading(meter_id="AMPDS2-WHE", interval_start="2012-04-01T00:00:00Z", value_wh=5200, unit="Wh", seq=0)
+BASE = Reading(
+    meter_id="AMPDS2-WHE",
+    interval_start="2012-04-01T00:00:00Z",
+    value_wh=5200,
+    unit="Wh",
+    seq=0,
+)
 
 
 def test_digest_is_32_bytes():
@@ -41,7 +47,8 @@ def test_every_field_is_covered_by_the_digest():
 def test_record_key_ignores_value():
     # The key names the slot; editing the value must not move the reading to a new slot
     assert record_key(BASE.meter_id, BASE.interval_start) == record_key(
-        replace(BASE, value_wh=25200).meter_id, replace(BASE, value_wh=25200).interval_start
+        replace(BASE, value_wh=25200).meter_id,
+        replace(BASE, value_wh=25200).interval_start,
     )
 
 
@@ -61,4 +68,6 @@ def test_canonical_bytes_are_unambiguous():
 
 def test_record_key_is_unambiguous():
     # ("AB", "C...") and ("A", "BC...") must not collide either
-    assert record_key("AB", "C2012-04-01T00:00:00Z") != record_key("A", "BC2012-04-01T00:00:00Z")
+    assert record_key("AB", "C2012-04-01T00:00:00Z") != record_key(
+        "A", "BC2012-04-01T00:00:00Z"
+    )
