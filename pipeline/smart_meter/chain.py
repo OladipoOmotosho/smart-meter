@@ -9,22 +9,103 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 from web3 import Web3
 from web3.contract import Contract
-from web3.exceptions import TransactionNotFound, Web3Exception
+from web3.exceptions import (
+    ContractLogicError,
+    TimeExhausted,
+    TransactionNotFound,
+    Web3Exception,
+    Web3RPCError,
+)
 
 from .fingerprint import KEY_DOMAIN, READING_DOMAIN
+
+DEFAULT_RECEIPT_TIMEOUT = 30.0
+DEFAULT_POLL_SECONDS = 0.1
+PENDING = "pending without receipt"
+UNKNOWN = "unknown to node; nonce unused"
+
+
+class TxState(StrEnum):
+    """What is known about one signed transaction."""
+
+    SUCCEEDED = "SUCCEEDED"  # mined with status 1
+    REVERTED = "REVERTED"  # mined with status 0: definite failure
+    REPLACED = "REPLACED"  # its nonce was used by another transaction: never mined
+    UNCERTAIN = "UNCERTAIN"  # may or may not take effect; reconcile before resending
+
+
+@dataclass(frozen=True)
+class PreparedTx:
+    """A signed transaction whose identity is known before broadcast.
+
+    `raw` is the signed payload (not the key); it can be rebroadcast unchanged.
+    """
+
+    tx_hash: str
+    sender: str
+    nonce: int
+    raw: bytes = field(repr=False)
 
 
 @dataclass(frozen=True)
 class TxResult:
     tx_hash: str
-    gas_used: int
-    seconds: float  # wall-clock time from send to mined receipt
-    status: int  # 1 = success, 0 = reverted
+    sender: str
+    nonce: int
+    state: TxState
+    reason: str
+    status: int | None = None  # receipt status when mined
+    gas_used: int | None = None
+    block_number: int | None = None
+    block_hash: str | None = None
+    seconds: float | None = None  # send-to-receipt time; None when not observed
+
+
+class SubmissionError(Exception):
+    """Base for transaction failures that are definite, not uncertain."""
+
+
+class PreflightError(SubmissionError):
+    """Nothing was broadcast. kind: 'revert', 'rejected' or 'unavailable'."""
+
+    def __init__(self, kind: str, reason: str, sender: str, data: str | None = None):
+        super().__init__(f"preflight {kind}: {reason}")
+        self.kind, self.reason, self.sender, self.data = kind, reason, sender, data
+
+
+class BroadcastRejected(SubmissionError):
+    """The node refused this signed transaction and does not know its hash."""
+
+    def __init__(self, prepared: PreparedTx, reason: str):
+        super().__init__(f"broadcast rejected for {prepared.tx_hash}: {reason}")
+        self.tx_hash, self.sender, self.nonce = (
+            prepared.tx_hash,
+            prepared.sender,
+            prepared.nonce,
+        )
+        self.reason = reason
+
+
+class TransactionReverted(SubmissionError):
+    """A mined receipt reported failure."""
+
+    def __init__(self, result: TxResult):
+        super().__init__(f"transaction reverted: {result.tx_hash}")
+        self.result = result
+
+
+class SubmissionUncertain(Exception):
+    """The outcome is unknown; reconcile by hash before any further submission."""
+
+    def __init__(self, result: TxResult):
+        super().__init__(f"submission uncertain for {result.tx_hash}: {result.reason}")
+        self.result = result
 
 
 def connect(rpc_url: str) -> Web3:
@@ -46,31 +127,130 @@ def load_contract(w3: Web3, address: str, artifact_path: Path) -> Contract:
     return w3.eth.contract(address=Web3.to_checksum_address(address), abi=abi)
 
 
-def send_tx(w3: Web3, contract_fn, private_key: str) -> TxResult:
-    """Sign a contract call with private_key, send it, and wait for the receipt.
+def _revert_data(error: ContractLogicError) -> str | None:
+    data = getattr(error, "data", None)
+    return data if isinstance(data, str) and data.startswith("0x") else None
+
+
+def prepare_tx(
+    w3: Web3, contract_fn, private_key: str, *, gas: int | None = None
+) -> PreparedTx:
+    """Preflight (unless gas is given) and sign, without broadcasting.
+
+    Raises PreflightError if the call would revert, the node refuses it or the
+    node is unreachable; in every case nothing has been sent.
+    """
+    account = w3.eth.account.from_key(private_key)
+    sender = account.address
+    try:
+        params = {
+            "from": sender,
+            "nonce": w3.eth.get_transaction_count(sender, "pending"),
+        }
+        if gas is not None:
+            params["gas"] = gas
+        tx = contract_fn.build_transaction(params)
+    except ContractLogicError as error:
+        raise PreflightError(
+            "revert", str(error), sender, _revert_data(error)
+        ) from error
+    except Web3RPCError as error:
+        raise PreflightError("rejected", str(error), sender) from error
+    except (Web3Exception, OSError) as error:
+        raise PreflightError("unavailable", str(error), sender) from error
+    signed = account.sign_transaction(tx)
+    return PreparedTx(
+        _hex(signed.hash), sender, int(tx["nonce"]), bytes(signed.raw_transaction)
+    )
+
+
+def _from_receipt(
+    tx_hash: str, sender: str, nonce: int, receipt, seconds: float | None
+) -> TxResult:
+    status = int(receipt["status"])
+    return TxResult(
+        tx_hash,
+        sender,
+        nonce,
+        TxState.SUCCEEDED if status == 1 else TxState.REVERTED,
+        "mined with status 1" if status == 1 else "mined with status 0",
+        status=status,
+        gas_used=int(receipt["gasUsed"]),
+        block_number=int(receipt["blockNumber"]),
+        block_hash=_hex(receipt["blockHash"]),
+        seconds=seconds,
+    )
+
+
+def broadcast(
+    w3: Web3,
+    prepared: PreparedTx,
+    *,
+    timeout: float = DEFAULT_RECEIPT_TIMEOUT,
+    poll: float = DEFAULT_POLL_SECONDS,
+) -> TxResult:
+    """Send once and wait a bounded time. Never resends or picks a new nonce."""
+    ident = (prepared.tx_hash, prepared.sender, prepared.nonce)
+    start = time.perf_counter()
+    try:
+        w3.eth.send_raw_transaction(prepared.raw)
+    except Web3RPCError as error:
+        # The node answered. Proceed only if it already knows this exact hash.
+        known = lookup(w3, *ident)
+        if known.reason == UNKNOWN:
+            raise BroadcastRejected(prepared, str(error)) from error
+        if known.reason != PENDING:
+            return known  # mined, replaced, or the lookup itself failed
+    except (Web3Exception, OSError) as error:
+        return TxResult(*ident, TxState.UNCERTAIN, f"broadcast response lost: {error}")
+    try:
+        receipt = w3.eth.wait_for_transaction_receipt(
+            prepared.tx_hash, timeout=timeout, poll_latency=poll
+        )
+    except TimeExhausted:
+        return TxResult(*ident, TxState.UNCERTAIN, f"no receipt within {timeout}s")
+    except (Web3Exception, OSError) as error:
+        return TxResult(*ident, TxState.UNCERTAIN, f"receipt wait failed: {error}")
+    return _from_receipt(*ident, receipt, time.perf_counter() - start)
+
+
+def lookup(w3: Web3, tx_hash: str, sender: str, nonce: int) -> TxResult:
+    """Classify a previously signed transaction from chain state alone."""
+    ident = (tx_hash, sender, nonce)
+    try:
+        # Read the mined nonce first: if it already passed ours and no receipt
+        # exists afterwards, another transaction consumed it.
+        consumed = w3.eth.get_transaction_count(sender, "latest") > nonce
+        try:
+            return _from_receipt(*ident, w3.eth.get_transaction_receipt(tx_hash), None)
+        except TransactionNotFound:
+            pass
+        if consumed:
+            return TxResult(
+                *ident, TxState.REPLACED, "nonce used by another transaction"
+            )
+        try:
+            w3.eth.get_transaction(tx_hash)
+        except TransactionNotFound:
+            return TxResult(*ident, TxState.UNCERTAIN, UNKNOWN)
+        return TxResult(*ident, TxState.UNCERTAIN, PENDING)
+    except (Web3Exception, OSError) as error:
+        return TxResult(*ident, TxState.UNCERTAIN, f"lookup failed: {error}")
+
+
+def send_tx(
+    w3: Web3,
+    contract_fn,
+    private_key: str,
+    *,
+    timeout: float = DEFAULT_RECEIPT_TIMEOUT,
+) -> TxResult:
+    """Prepare, broadcast once and classify. See prepare_tx and broadcast.
 
     Example:
         send_tx(w3, contract.functions.commit(key, digest), settings.aggregator_key)
-
-    If the contract would revert (wrong role, already committed), web3 raises
-    web3.exceptions.ContractLogicError while estimating gas, before anything is
-    sent. Your attack tests should expect that exception.
     """
-    account = w3.eth.account.from_key(private_key)
-    tx = contract_fn.build_transaction(
-        {
-            "from": account.address,
-            "nonce": w3.eth.get_transaction_count(account.address),
-        }
-    )
-    signed = account.sign_transaction(tx)
-    start = time.perf_counter()
-    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    seconds = time.perf_counter() - start
-    return TxResult(
-        tx_hash.hex(), int(receipt["gasUsed"]), seconds, int(receipt["status"])
-    )
+    return broadcast(w3, prepare_tx(w3, contract_fn, private_key), timeout=timeout)
 
 
 # --- Deployment context (Task 6.1, R4.6, R6.3) ---------------------------------

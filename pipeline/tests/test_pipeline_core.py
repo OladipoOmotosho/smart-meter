@@ -50,11 +50,15 @@ def local(tmp_path):
         conn.close()
 
 
+def _tx(state, status=None):
+    return chain.TxResult("0x1234", "0xsender", 0, state, "fake", status=status)
+
+
 def _send_success(monkeypatch, registry):
     def send(_w3, call, _key):
         key, value = call
         registry.entries[key] = value
-        return chain.TxResult("0x1234", 120000, 0.01, 1)
+        return _tx(chain.TxState.SUCCEEDED, 1)
 
     monkeypatch.setattr(chain, "send_tx", send)
 
@@ -125,17 +129,26 @@ def test_ingestion_rejects_invalid_identity_before_side_effects(
 
 
 def test_status_zero_never_confirms(local, monkeypatch):
-    monkeypatch.setattr(
-        chain, "send_tx", lambda *_: chain.TxResult("0xdead", 120000, 0.01, 0)
-    )
-    with pytest.raises(ValueError, match="transaction reverted"):
+    monkeypatch.setattr(chain, "send_tx", lambda *_: _tx(chain.TxState.REVERTED, 0))
+    with pytest.raises(chain.TransactionReverted, match="transaction reverted"):
         _ingest(local)
+    assert local[1].entries == {}
+    assert not (local[2] / "results.csv").exists()
+
+
+def test_uncertain_submission_never_confirms(local, monkeypatch):
+    monkeypatch.setattr(chain, "send_tx", lambda *_: _tx(chain.TxState.UNCERTAIN))
+    with pytest.raises(chain.SubmissionUncertain) as caught:
+        _ingest(local)
+    assert caught.value.result.tx_hash == "0x1234"
+    assert local[1].entries == {}
+    assert not (local[2] / "results.csv").exists()
 
 
 def test_mismatching_confirmation_never_confirms(local, monkeypatch):
     def wrong(_w3, call, _key):
         local[1].entries[call[0]] = bytes.fromhex("22" * 32)
-        return chain.TxResult("0x1234", 120000, 0.01, 1)
+        return _tx(chain.TxState.SUCCEEDED, 1)
 
     monkeypatch.setattr(chain, "send_tx", wrong)
     with pytest.raises(ValueError, match="confirmation mismatch"):

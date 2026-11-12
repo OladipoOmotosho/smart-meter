@@ -69,8 +69,10 @@ def ingest(
             reconciled += 1
             continue
         tx = chain.send_tx(w3, contract.functions.commit(key, expected), aggregator_key)
-        if tx.status != 1:
-            raise ValueError(f"transaction reverted: {tx.tx_hash}")
+        if tx.state is chain.TxState.UNCERTAIN:
+            raise chain.SubmissionUncertain(tx)
+        if tx.state is not chain.TxState.SUCCEEDED:
+            raise chain.TransactionReverted(tx)
         confirmed = contract.functions.getCommitment(key).call()
         if confirmed[0] != expected:
             raise ValueError(f"registry confirmation mismatch for {key.hex()}")
