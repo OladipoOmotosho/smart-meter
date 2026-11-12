@@ -43,6 +43,9 @@ def test_contract_skip_and_absent_case_fail(tmp_path):
     assert result.returncode == 1
     assert "test_AggregatorCanCommit (SKIP)" in result.stderr
     assert "test_RevertWhen_ZeroDigest" in result.stderr
+    assert "required case absent: invariant_RegistryMatchesFirstCommitAndRoleModel" in (
+        result.stderr
+    )
 
 
 def test_skipped_fuzz_contract_case_fails(tmp_path):
