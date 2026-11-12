@@ -43,3 +43,28 @@ def test_contract_skip_and_absent_case_fail(tmp_path):
     assert result.returncode == 1
     assert "test_AggregatorCanCommit (SKIP)" in result.stderr
     assert "test_RevertWhen_ZeroDigest" in result.stderr
+    assert "required case absent: invariant_RegistryMatchesFirstCommitAndRoleModel" in (
+        result.stderr
+    )
+
+
+def test_skipped_fuzz_contract_case_fails(tmp_path):
+    required = [
+        "test_AggregatorCanCommit",
+        "test_GetCommitmentReturnsStoredValues",
+        "test_UnknownKeyIsEmpty",
+        "test_RevertWhen_UnauthorizedCommit",
+        "test_RevertWhen_KeyAlreadyCommitted",
+        "test_RevertWhen_ZeroDigest",
+        "test_EmitsCommittedEvent",
+    ]
+    report = tmp_path / "forge.txt"
+    report.write_text(
+        "\n".join(f"[PASS] {name}() (gas: 1)" for name in required)
+        + "\n[SKIP: disabled] testFuzz_FirstCommitRemainsFixed(bytes32,bytes32,bytes32)\n"
+    )
+
+    result = _check("contracts", report)
+
+    assert result.returncode == 1
+    assert "testFuzz_FirstCommitRemainsFixed (SKIP)" in result.stderr

@@ -13,7 +13,6 @@ from smart_meter.fingerprint import digest, record_key
 from smart_meter.models import Reading, Verdict
 from smart_meter.verifier import verify
 from web3 import Web3
-from web3.exceptions import ContractCustomError
 
 pytestmark = pytest.mark.chain
 READING = Reading("TEST-METER", "2022-01-01T00:00:00Z", 60)
@@ -97,12 +96,13 @@ def test_A2_unauthorized_submission_is_rejected(world):
         ["address", "bytes32"],
         [world[6], registry.functions.AGGREGATOR_ROLE().call()],
     )
-    with pytest.raises(ContractCustomError) as caught:
+    with pytest.raises(chain.PreflightError) as caught:
         chain.send_tx(
             w3,
             registry.functions.commit(key, digest(READING)),
             os.environ["ATTACKER_PRIVATE_KEY"],
         )
+    assert caught.value.kind == "revert"
     assert caught.value.data == expected
     assert not registry.functions.isCommitted(key).call()
 
@@ -113,12 +113,13 @@ def test_A3_existing_fingerprint_cannot_be_replaced(world):
     w3, registry, _, _, _, _, _ = world
     key = record_key(READING.meter_id, READING.interval_start)
     expected = _error_data("AlreadyCommitted(bytes32)", ["bytes32"], [key])
-    with pytest.raises(ContractCustomError) as caught:
+    with pytest.raises(chain.PreflightError) as caught:
         chain.send_tx(
             w3,
             registry.functions.commit(key, digest(replace(READING, value_wh=25200))),
             os.environ["AGGREGATOR_PRIVATE_KEY"],
         )
+    assert caught.value.kind == "revert"
     assert caught.value.data == expected
     assert _entry(world) == before
 
@@ -166,7 +167,7 @@ def test_S7_revoked_role_cannot_submit(world):
         ["address", "bytes32"],
         [aggregator, role],
     )
-    with pytest.raises(ContractCustomError) as caught:
+    with pytest.raises(chain.PreflightError) as caught:
         chain.send_tx(
             w3,
             registry.functions.commit(
@@ -174,6 +175,7 @@ def test_S7_revoked_role_cannot_submit(world):
             ),
             os.environ["AGGREGATOR_PRIVATE_KEY"],
         )
+    assert caught.value.kind == "revert"
     assert caught.value.data == expected
     assert _entry(world)[0] == digest(READING)
 

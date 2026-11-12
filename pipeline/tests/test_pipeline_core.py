@@ -50,11 +50,15 @@ def local(tmp_path):
         conn.close()
 
 
+def _tx(state, status=None):
+    return chain.TxResult("0x1234", "0xsender", 0, state, "fake", status=status)
+
+
 def _send_success(monkeypatch, registry):
     def send(_w3, call, _key):
         key, value = call
         registry.entries[key] = value
-        return chain.TxResult("0x1234", 120000, 0.01, 1)
+        return _tx(chain.TxState.SUCCEEDED, 1)
 
     monkeypatch.setattr(chain, "send_tx", send)
 
@@ -100,22 +104,51 @@ def test_chain_conflict_stops_before_chain_write(local, monkeypatch):
     ],
 )
 def test_ingestion_rejects_wrong_unit_or_interval(local, reading):
-    with pytest.raises(ValueError, match="hourly UTC Wh"):
+    with pytest.raises(ValueError, match=r"hourly UTC Wh|canonical hourly UTC"):
         _ingest(local, reading)
 
 
+@pytest.mark.parametrize(
+    "reading",
+    [
+        replace(READING, meter_id=""),
+        replace(READING, interval_start="garbage:00:00Z"),
+        replace(READING, interval_start="2022-02-30T00:00:00Z"),
+    ],
+)
+def test_ingestion_rejects_invalid_identity_before_side_effects(
+    local, monkeypatch, reading
+):
+    monkeypatch.setattr(chain, "send_tx", lambda *_: pytest.fail("unexpected write"))
+
+    with pytest.raises(ValueError, match=r"valid meter ID|canonical hourly UTC"):
+        _ingest(local, reading)
+
+    assert db.all_keys(local[0]) == []
+    assert local[1].entries == {}
+
+
 def test_status_zero_never_confirms(local, monkeypatch):
-    monkeypatch.setattr(
-        chain, "send_tx", lambda *_: chain.TxResult("0xdead", 120000, 0.01, 0)
-    )
-    with pytest.raises(ValueError, match="transaction reverted"):
+    monkeypatch.setattr(chain, "send_tx", lambda *_: _tx(chain.TxState.REVERTED, 0))
+    with pytest.raises(chain.TransactionReverted, match="transaction reverted"):
         _ingest(local)
+    assert local[1].entries == {}
+    assert not (local[2] / "results.csv").exists()
+
+
+def test_uncertain_submission_never_confirms(local, monkeypatch):
+    monkeypatch.setattr(chain, "send_tx", lambda *_: _tx(chain.TxState.UNCERTAIN))
+    with pytest.raises(chain.SubmissionUncertain) as caught:
+        _ingest(local)
+    assert caught.value.result.tx_hash == "0x1234"
+    assert local[1].entries == {}
+    assert not (local[2] / "results.csv").exists()
 
 
 def test_mismatching_confirmation_never_confirms(local, monkeypatch):
     def wrong(_w3, call, _key):
         local[1].entries[call[0]] = bytes.fromhex("22" * 32)
-        return chain.TxResult("0x1234", 120000, 0.01, 1)
+        return _tx(chain.TxState.SUCCEEDED, 1)
 
     monkeypatch.setattr(chain, "send_tx", wrong)
     with pytest.raises(ValueError, match="confirmation mismatch"):
@@ -180,6 +213,22 @@ def test_corrupt_record_and_unavailable_registry_are_errors(local):
         verify(conn, registry, READING.meter_id, READING.interval_start).outcome
         == Verdict.ERROR
     )
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [("value_wh", 60.9), ("seq", 0.5)],
+)
+def test_fractional_stored_integer_is_an_audit_error(local, monkeypatch, column, value):
+    _send_success(monkeypatch, local[1])
+    _ingest(local)
+    local[0].execute(f"UPDATE readings SET {column} = ?", (value,))
+    local[0].commit()
+
+    result = verify(local[0], local[1], READING.meter_id, READING.interval_start)
+
+    assert result.outcome == Verdict.ERROR
+    assert "record read" in result.reason
 
 
 @pytest.mark.parametrize("entry", [(), ("bad", 1, "writer"), (b"short", 1, "writer")])

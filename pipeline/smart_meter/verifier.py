@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections.abc import Iterable
 from pathlib import Path
 
+from web3 import Web3
 from web3.contract import Contract
 from web3.exceptions import Web3Exception
 
-from . import db, results
+from . import chain, db, results
 from .fingerprint import digest, record_key
 from .models import AuditResult, Verdict
 
@@ -68,3 +70,46 @@ def verify(
             note=reason,
         )
     return result
+
+
+def verify_in_context(
+    conn: sqlite3.Connection,
+    w3: Web3,
+    context: chain.DeploymentContext,
+    artifact_path: Path,
+    identities: Iterable[tuple[str, str]],
+    results_path: Path | None = None,
+) -> list[AuditResult]:
+    """Validate the recorded deployment once, then audit each identity.
+
+    An invalid or unreachable deployment yields ERROR for every identity; it is
+    never reported as a missing commitment or a verified reading (R6.3).
+    """
+    identities = list(identities)
+    start = time.perf_counter()
+    try:
+        contract = chain.validate_deployment(w3, context, artifact_path)
+    except chain.DeploymentContextError as error:
+        reason = f"deployment context invalid: {error}"
+        elapsed = time.perf_counter() - start
+        failures = []
+        for meter_id, interval_start in identities:
+            key = record_key(meter_id, interval_start).hex()
+            failures.append(
+                AuditResult(Verdict.ERROR, reason, key, None, None, elapsed)
+            )
+            if results_path is not None:
+                results.log(
+                    results_path,
+                    "verify",
+                    meter_id,
+                    interval_start,
+                    verdict=Verdict.ERROR.value,
+                    seconds=elapsed,
+                    note=reason,
+                )
+        return failures
+    return [
+        verify(conn, contract, meter_id, interval_start, results_path)
+        for meter_id, interval_start in identities
+    ]

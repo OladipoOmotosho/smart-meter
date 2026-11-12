@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from web3 import Web3
@@ -22,6 +23,25 @@ class IngestSummary:
     reconciled: int
 
 
+def _validate_reading(reading: Reading) -> None:
+    if not isinstance(reading.meter_id, str) or not reading.meter_id.strip():
+        raise ValueError("ingestion requires a valid meter ID")
+    try:
+        parsed = datetime.strptime(reading.interval_start, "%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "ingestion requires a canonical hourly UTC timestamp"
+        ) from error
+    if (
+        parsed.minute != 0
+        or parsed.second != 0
+        or parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != reading.interval_start
+    ):
+        raise ValueError("ingestion requires a canonical hourly UTC timestamp")
+    if reading.unit != "Wh":
+        raise ValueError("ingestion requires an hourly UTC Wh reading")
+
+
 def ingest(
     readings: Iterable[Reading],
     conn: sqlite3.Connection,
@@ -34,8 +54,7 @@ def ingest(
     attempted = newly_confirmed = reconciled = 0
     for reading in readings:
         attempted += 1
-        if reading.unit != "Wh" or not reading.interval_start.endswith(":00:00Z"):
-            raise ValueError("ingestion requires an hourly UTC Wh reading")
+        _validate_reading(reading)
         key = record_key(reading.meter_id, reading.interval_start)
         expected = digest(reading)
         existing = db.get_reading(conn, reading.meter_id, reading.interval_start)
@@ -50,8 +69,10 @@ def ingest(
             reconciled += 1
             continue
         tx = chain.send_tx(w3, contract.functions.commit(key, expected), aggregator_key)
-        if tx.status != 1:
-            raise ValueError(f"transaction reverted: {tx.tx_hash}")
+        if tx.state is chain.TxState.UNCERTAIN:
+            raise chain.SubmissionUncertain(tx)
+        if tx.state is not chain.TxState.SUCCEEDED:
+            raise chain.TransactionReverted(tx)
         confirmed = contract.functions.getCommitment(key).call()
         if confirmed[0] != expected:
             raise ValueError(f"registry confirmation mismatch for {key.hex()}")
@@ -66,3 +87,18 @@ def ingest(
             note=tx.tx_hash,
         )
     return IngestSummary(attempted, newly_confirmed, reconciled)
+
+
+def ingest_in_context(
+    readings: Iterable[Reading],
+    conn: sqlite3.Connection,
+    w3: Web3,
+    context: chain.DeploymentContext,
+    artifact_path: Path,
+    aggregator_key: str,
+    results_path: Path,
+) -> IngestSummary:
+    """Validate deployment, code and signer role before any storage or chain effect."""
+    signer = w3.eth.account.from_key(aggregator_key).address
+    contract = chain.validate_deployment(w3, context, artifact_path, writer=signer)
+    return ingest(readings, conn, w3, contract, aggregator_key, results_path)
