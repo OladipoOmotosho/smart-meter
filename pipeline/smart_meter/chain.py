@@ -72,7 +72,8 @@ class SubmissionError(Exception):
 
 
 class PreflightError(SubmissionError):
-    """Nothing was broadcast. kind: 'revert', 'rejected' or 'unavailable'."""
+    """Nothing was broadcast. kind: 'revert', 'rejected', 'unavailable' or
+    'configuration' (a malformed signing key)."""
 
     def __init__(self, kind: str, reason: str, sender: str, data: str | None = None):
         super().__init__(f"preflight {kind}: {reason}")
@@ -140,7 +141,11 @@ def prepare_tx(
     Raises PreflightError if the call would revert, the node refuses it or the
     node is unreachable; in every case nothing has been sent.
     """
-    account = w3.eth.account.from_key(private_key)
+    try:
+        account = w3.eth.account.from_key(private_key)
+    except (ValueError, TypeError) as error:
+        # Never echo the key material; the message names only the problem.
+        raise PreflightError("configuration", "signing key is malformed", "") from error
     sender = account.address
     try:
         params = {
@@ -433,7 +438,65 @@ def _artifact(artifact_path: Path) -> tuple[list, str, str]:
         ) from error
     if not code:
         raise DeploymentContextError("contract artifact has no runtime bytecode")
+    _check_interface(abi, code)
     return abi, _hex(Web3.keccak(code)), compiler
+
+
+# The registry interface the pipeline calls, as canonical signature -> outputs.
+REQUIRED_FUNCTIONS = {
+    "commit(bytes32,bytes32)": (),
+    "getCommitment(bytes32)": ("(bytes32,uint64,address)",),
+    "isCommitted(bytes32)": ("bool",),
+    "AGGREGATOR_ROLE()": ("bytes32",),
+    "hasRole(bytes32,address)": ("bool",),
+}
+REQUIRED_EVENT = (
+    "Committed(bytes32,bytes32,address,uint64)",
+    (True, False, True, False),  # recordKey and submitter are indexed
+)
+
+
+def _abi_type(param: dict) -> str:
+    kind = param["type"]
+    if kind.startswith("tuple"):
+        inner = ",".join(_abi_type(c) for c in param["components"])
+        return f"({inner}){kind[len('tuple') :]}"
+    return kind
+
+
+def _check_interface(abi: object, code: bytes) -> None:
+    """Require the exact interface used, implemented by the artifact's code.
+
+    The code hash is compared with the chain separately; requiring each function
+    selector and the event topic in that code ties the ABI to the verified code.
+    """
+    try:
+        functions: dict[str, tuple[str, ...]] = {}
+        events: dict[str, tuple[bool, ...]] = {}
+        for entry in abi:  # type: ignore[union-attr]
+            if entry.get("type") not in {"function", "event"}:
+                continue
+            signature = (
+                f"{entry['name']}({','.join(_abi_type(p) for p in entry['inputs'])})"
+            )
+            if entry["type"] == "function":
+                functions[signature] = tuple(_abi_type(p) for p in entry["outputs"])
+            else:
+                events[signature] = tuple(bool(p["indexed"]) for p in entry["inputs"])
+    except (AttributeError, KeyError, TypeError) as error:
+        raise DeploymentContextError(f"contract ABI is malformed: {error}") from error
+    for signature, outputs in REQUIRED_FUNCTIONS.items():
+        if functions.get(signature) != outputs:
+            raise DeploymentContextError(
+                f"contract ABI lacks {signature} returning {outputs or 'nothing'}"
+            )
+        if bytes(Web3.keccak(text=signature)[:4]) not in code:
+            raise DeploymentContextError(f"{signature} is not implemented by the code")
+    event, indexed = REQUIRED_EVENT
+    if events.get(event) != indexed:
+        raise DeploymentContextError(f"contract ABI lacks event {event} as deployed")
+    if bytes(Web3.keccak(text=event)) not in code:
+        raise DeploymentContextError(f"event {event} is not implemented by the code")
 
 
 def _chain_read(description: str, read):

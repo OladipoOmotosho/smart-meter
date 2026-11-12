@@ -35,6 +35,8 @@ class RunPaths:
     db: Path
     results: Path
     manifest: Path
+    expected: Path
+    lock: Path
 
 
 def run_paths(
@@ -52,7 +54,12 @@ def run_paths(
         except FileExistsError as error:
             raise ConfigurationError(f"run directory already exists: {root}") from error
     return RunPaths(
-        root, root / "readings.sqlite", root / "results.csv", root / "manifest.json"
+        root,
+        root / "readings.sqlite",
+        root / "results.csv",
+        root / "manifest.json",
+        root / "expected_records.json",
+        root / "writer.lock",
     )
 
 
