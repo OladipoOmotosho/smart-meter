@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .models import Reading
 
-REQUIRED_COLUMNS = {"unix_ts", "P"}
+WHE_HEADER = "unix_ts,V,I,f,DPF,APF,P,Pt,Q,Qt,S,St".split(",")
 UNIX_SECONDS = re.compile(r"\+?[0-9]+\Z")
 
 
@@ -28,15 +28,15 @@ class LoadMetadata:
     selected_end: str | None = None
 
 
-def _sample(row: dict[str, str], line: int) -> tuple[int, Fraction, bool]:
-    raw_ts = row["unix_ts"].strip()
+def _sample(row: dict[str, str | None], line: int) -> tuple[int, Fraction, bool]:
+    raw_ts = (row["unix_ts"] or "").strip()
     if not UNIX_SECONDS.fullmatch(raw_ts):
         raise ValueError(f"invalid unix_ts at source row {line}")
     imputed = raw_ts.startswith("+")
     timestamp = int(raw_ts.lstrip("+"))
     if timestamp % 60:
         raise ValueError(f"unaligned unix_ts at source row {line}")
-    raw_power = row["P"].strip()
+    raw_power = (row["P"] or "").strip()
     if not raw_power:
         raise ValueError(f"missing P at source row {line}")
     try:
@@ -76,10 +76,8 @@ def load_readings(
     details = metadata if metadata is not None else LoadMetadata()
     with Path(path).open(newline="") as source:
         reader = csv.DictReader(source)
-        if reader.fieldnames is None or not REQUIRED_COLUMNS.issubset(
-            reader.fieldnames
-        ):
-            raise ValueError("expected AMPds2 WHE columns unix_ts and P")
+        if reader.fieldnames != WHE_HEADER:
+            raise ValueError("expected the AMPds2 WHE header at source row 1")
         hour: int | None = None
         powers: list[Fraction] = []
         imputed_in_hour = 0
