@@ -30,6 +30,16 @@ class Verdict(str, Enum):
     ERROR = "ERROR"
 
 
+class SubmissionState(str, Enum):
+    """Journal lifecycle of one intended commitment (design section 6)."""
+
+    PREPARED = "PREPARED"  # reading and intent stored; nothing signed yet
+    SUBMITTED = "SUBMITTED"  # signed transaction identity stored before broadcast
+    CONFIRMED = "CONFIRMED"  # success receipt or reconciliation, registry matches
+    FAILED = "FAILED"  # definite rejection, revert or replacement observed
+    UNCERTAIN = "UNCERTAIN"  # outcome unknown; reconcile before resubmitting
+
+
 @dataclass(frozen=True)
 class AuditResult:
     outcome: Verdict
