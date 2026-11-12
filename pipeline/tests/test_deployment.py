@@ -3,6 +3,7 @@
 import json
 import socket
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 from smart_meter import chain, db
@@ -124,7 +125,7 @@ def _closed_rpc() -> Web3:
 
 
 def _artifact(tmp_path):
-    """A faithful copy of the built artifact and its runtime-code hash."""
+    """A copy of the tracked artifact fixture and its runtime-code hash."""
     return _real_artifact(tmp_path, lambda artifact: None)
 
 
@@ -174,8 +175,13 @@ def test_artifact_mismatch_fails_before_any_rpc(tmp_path):
         chain.validate_deployment(_closed_rpc(), _context(), tmp_path / "absent.json")
 
 
+# A tracked copy of the registry ABI with a synthetic runtime, so these fast
+# tests do not need `forge build` (the CI Python job has no Foundry).
+ARTIFACT_FIXTURE = Path(__file__).parent / "fixtures" / "registry_artifact.json"
+
+
 def _real_artifact(tmp_path, mutate):
-    artifact = json.loads(ARTIFACT_PATH.read_text())
+    artifact = json.loads(ARTIFACT_FIXTURE.read_text())
     mutate(artifact)
     path = tmp_path / "tampered.json"
     path.write_text(json.dumps(artifact))
@@ -291,6 +297,18 @@ def _rpc(w3, method, *params):
 def deployed(deployment):
     d = deployment
     return d.w3, d.registry, d.context, d.admin, d.aggregator, d.attacker, d
+
+
+@pytest.mark.chain
+def test_artifact_fixture_abi_matches_the_compiled_contract():
+    """Guards the fast-suite fixture against drifting from the real contract."""
+    compiled = json.loads(ARTIFACT_PATH.read_text())
+    fixture = json.loads(ARTIFACT_FIXTURE.read_text())
+    assert fixture["abi"] == compiled["abi"]
+    assert fixture["metadata"]["compiler"] == compiled["metadata"]["compiler"]
+    runtime = bytes.fromhex(compiled["deployedBytecode"]["object"].removeprefix("0x"))
+    for part in [*SELECTORS, TOPIC]:
+        assert part in runtime
 
 
 @pytest.mark.chain
