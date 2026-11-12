@@ -1,19 +1,16 @@
 """Task 6.2: transaction outcomes are classified, never guessed (R5.2-R5.4, R7.6).
 
 Fast cases inject faults through a minimal fake node. Chain cases use the
-runner's owned Anvil for a real mined revert, a real receipt timeout and a
+owned Anvil fixtures in conftest.py for a real mined revert, a real receipt timeout and a
 real nonce replacement.
 """
 
-import json
-import os
 from types import SimpleNamespace
 
 import pytest
 from eth_abi import encode
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from smart_meter import chain
-from smart_meter.config import ARTIFACT_PATH
 from web3 import Web3
 from web3.exceptions import (
     ContractCustomError,
@@ -145,6 +142,15 @@ def test_node_rejection_and_outage_in_preflight_are_distinct(node, error, kind):
         chain.send_tx(node, FakeCall(error), THROWAWAY_KEY)
     assert caught.value.kind == kind
     assert caught.value.data is None
+    assert node.eth.sent == []
+
+
+def test_malformed_key_is_a_typed_configuration_error_without_key_echo(node):
+    bad = "0xnot-a-key-secret-material"
+    with pytest.raises(chain.PreflightError) as caught:
+        chain.prepare_tx(node, FakeCall(), bad)
+    assert caught.value.kind == "configuration"
+    assert "secret-material" not in str(caught.value)
     assert node.eth.sent == []
 
 
@@ -284,33 +290,18 @@ def _rpc(w3, method, *params):
 
 
 @pytest.fixture
-def registry():
-    w3 = chain.connect(os.environ["RPC_URL"])
-    admin, aggregator = w3.eth.accounts[:2]
-    artifact = json.loads(ARTIFACT_PATH.read_text())
-    factory = w3.eth.contract(
-        abi=artifact["abi"], bytecode=artifact["bytecode"]["object"]
-    )
-    receipt = w3.eth.wait_for_transaction_receipt(
-        factory.constructor(admin).transact({"from": admin})
-    )
-    contract = w3.eth.contract(address=receipt.contractAddress, abi=artifact["abi"])
-    w3.eth.wait_for_transaction_receipt(
-        contract.functions.grantRole(
-            contract.functions.AGGREGATOR_ROLE().call(), aggregator
-        ).transact({"from": admin})
-    )
-    return w3, contract
+def registry(deployment):
+    return deployment.w3, deployment.registry, deployment
 
 
 @pytest.mark.chain
 def test_real_success_receipt_matches_chain(registry):
-    w3, contract = registry
+    w3, contract, d = registry
     key, value = Web3.keccak(text="tx-success"), Web3.keccak(text="digest")
     result = chain.send_tx(
         w3,
         contract.functions.commit(key, value),
-        os.environ["AGGREGATOR_PRIVATE_KEY"],
+        d.aggregator_key,
     )
     assert result.state is chain.TxState.SUCCEEDED
     block = w3.eth.get_block(result.block_number)
@@ -323,8 +314,8 @@ def test_real_success_receipt_matches_chain(registry):
 
 @pytest.mark.chain
 def test_real_preflight_rejection_is_not_broadcast(registry):
-    w3, contract = registry
-    attacker = os.environ["ATTACKER_PRIVATE_KEY"]
+    w3, contract, d = registry
+    attacker = d.attacker_key
     sender = w3.eth.account.from_key(attacker).address
     nonce = w3.eth.get_transaction_count(sender, "pending")
     with pytest.raises(chain.PreflightError) as caught:
@@ -344,8 +335,8 @@ def test_real_preflight_rejection_is_not_broadcast(registry):
 
 @pytest.mark.chain
 def test_real_mined_revert_is_reverted_with_receipt(registry):
-    w3, contract = registry
-    attacker = os.environ["ATTACKER_PRIVATE_KEY"]
+    w3, contract, d = registry
+    attacker = d.attacker_key
     key = Web3.keccak(text="tx-revert")
     prepared = chain.prepare_tx(
         w3,
@@ -362,14 +353,14 @@ def test_real_mined_revert_is_reverted_with_receipt(registry):
 
 @pytest.mark.chain
 def test_real_timeout_is_uncertain_then_reconciles_after_mining(registry):
-    w3, contract = registry
+    w3, contract, d = registry
     key, value = Web3.keccak(text="tx-timeout"), Web3.keccak(text="digest")
     _rpc(w3, "evm_setAutomine", False)
     try:
         result = chain.send_tx(
             w3,
             contract.functions.commit(key, value),
-            os.environ["AGGREGATOR_PRIVATE_KEY"],
+            d.aggregator_key,
             timeout=0.5,
         )
         assert result.state is chain.TxState.UNCERTAIN
@@ -385,8 +376,8 @@ def test_real_timeout_is_uncertain_then_reconciles_after_mining(registry):
 
 @pytest.mark.chain
 def test_real_nonce_reuse_marks_unsent_transaction_replaced(registry):
-    w3, contract = registry
-    aggregator_key = os.environ["AGGREGATOR_PRIVATE_KEY"]
+    w3, contract, d = registry
+    aggregator_key = d.aggregator_key
     key = Web3.keccak(text="tx-replaced")
     unsent = chain.prepare_tx(
         w3, contract.functions.commit(key, Web3.keccak(text="a")), aggregator_key

@@ -1,7 +1,6 @@
 """Task 6.1: deployment records and context validation (R4.6, R6.3, R9.4-R9.5)."""
 
 import json
-import os
 import socket
 from dataclasses import replace
 
@@ -124,18 +123,9 @@ def _closed_rpc() -> Web3:
     )
 
 
-def _artifact(tmp_path, runtime="0x6000"):
-    path = tmp_path / "artifact.json"
-    path.write_text(
-        json.dumps(
-            {
-                "abi": [],
-                "deployedBytecode": {"object": runtime},
-                "metadata": {"compiler": {"version": "0.8.24"}},
-            }
-        )
-    )
-    return path, "0x" + Web3.keccak(hexstr=runtime).hex().removeprefix("0x")
+def _artifact(tmp_path):
+    """A faithful copy of the built artifact and its runtime-code hash."""
+    return _real_artifact(tmp_path, lambda artifact: None)
 
 
 def test_unreachable_rpc_is_audit_error_not_missing(tmp_path):
@@ -184,7 +174,111 @@ def test_artifact_mismatch_fails_before_any_rpc(tmp_path):
         chain.validate_deployment(_closed_rpc(), _context(), tmp_path / "absent.json")
 
 
-# --- Live deployments on the runner's owned Anvil ------------------------------
+def _real_artifact(tmp_path, mutate):
+    artifact = json.loads(ARTIFACT_PATH.read_text())
+    mutate(artifact)
+    path = tmp_path / "tampered.json"
+    path.write_text(json.dumps(artifact))
+    runtime = artifact["deployedBytecode"]["object"]
+    return path, "0x" + bytes(Web3.keccak(hexstr=runtime)).hex()
+
+
+def _drop(name):
+    return lambda a: a.update(abi=[e for e in a["abi"] if e.get("name") != name])
+
+
+def _retype_event(a):
+    for entry in a["abi"]:
+        if entry.get("name") == "Committed":
+            entry["inputs"][2]["indexed"] = False
+
+
+def _retype_output(a):
+    for entry in a["abi"]:
+        if entry.get("name") == "isCommitted":
+            entry["outputs"][0]["type"] = "uint256"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        _drop("getCommitment"),
+        _drop("commit"),
+        _drop("Committed"),
+        _drop("hasRole"),
+        lambda a: a.update(abi=[]),
+        lambda a: a.pop("abi"),
+        _retype_event,
+        _retype_output,
+    ],
+    ids=[
+        "no-getCommitment",
+        "no-commit",
+        "no-event",
+        "no-hasRole",
+        "empty-abi",
+        "missing-abi",
+        "event-indexing",
+        "output-type",
+    ],
+)
+def test_tampered_abi_is_rejected_before_any_rpc(tmp_path, mutate):
+    artifact, code_hash = _real_artifact(tmp_path, mutate)
+    context = _context(runtime_code_hash=code_hash)
+    with pytest.raises(chain.DeploymentContextError, match=r"ABI|malformed"):
+        chain.validate_deployment(_closed_rpc(), context, artifact)
+
+
+def test_abi_that_code_does_not_implement_is_rejected(tmp_path):
+    def foreign_runtime(a):
+        a["deployedBytecode"]["object"] = "0x6000"
+
+    artifact, code_hash = _real_artifact(tmp_path, foreign_runtime)
+    with pytest.raises(chain.DeploymentContextError, match="not implemented"):
+        chain.validate_deployment(
+            _closed_rpc(), _context(runtime_code_hash=code_hash), artifact
+        )
+
+
+def _runtime(*parts: bytes):
+    return lambda a: a["deployedBytecode"].update(object="0x" + b"".join(parts).hex())
+
+
+SELECTORS = [
+    bytes(Web3.keccak(text=sig)[:4])
+    for sig in (
+        "commit(bytes32,bytes32)",
+        "getCommitment(bytes32)",
+        "isCommitted(bytes32)",
+        "AGGREGATOR_ROLE()",
+        "hasRole(bytes32,address)",
+    )
+]
+TOPIC = bytes(Web3.keccak(text="Committed(bytes32,bytes32,address,uint64)"))
+
+
+def test_code_with_event_but_missing_selector_is_rejected(tmp_path):
+    """Review B08 control: isolates the selector check from the event check."""
+    artifact, code_hash = _real_artifact(tmp_path, _runtime(TOPIC, *SELECTORS[1:]))
+    with pytest.raises(
+        chain.DeploymentContextError, match=r"commit\(bytes32,bytes32\) is not"
+    ):
+        chain.validate_deployment(
+            _closed_rpc(), _context(runtime_code_hash=code_hash), artifact
+        )
+
+
+def test_code_with_selectors_but_missing_event_is_rejected(tmp_path):
+    artifact, code_hash = _real_artifact(tmp_path, _runtime(*SELECTORS))
+    with pytest.raises(
+        chain.DeploymentContextError, match=r"event .* is not implemented"
+    ):
+        chain.validate_deployment(
+            _closed_rpc(), _context(runtime_code_hash=code_hash), artifact
+        )
+
+
+# --- Live deployments on the owned Anvil (tests/conftest.py) ------------------
 
 
 def _rpc(w3, method, *params):
@@ -193,36 +287,15 @@ def _rpc(w3, method, *params):
     return response["result"]
 
 
-def _deploy(w3, admin, aggregator):
-    artifact = json.loads(ARTIFACT_PATH.read_text())
-    factory = w3.eth.contract(
-        abi=artifact["abi"], bytecode=artifact["bytecode"]["object"]
-    )
-    tx_hash = factory.constructor(admin).transact({"from": admin})
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    registry = w3.eth.contract(address=receipt.contractAddress, abi=artifact["abi"])
-    w3.eth.wait_for_transaction_receipt(
-        registry.functions.grantRole(
-            registry.functions.AGGREGATOR_ROLE().call(), aggregator
-        ).transact({"from": admin})
-    )
-    return "0x" + bytes(tx_hash).hex(), registry
-
-
 @pytest.fixture
-def deployed():
-    w3 = chain.connect(os.environ["RPC_URL"])
-    admin, aggregator, other = w3.eth.accounts[:3]
-    tx_hash, registry = _deploy(w3, admin, aggregator)
-    context = chain.capture_deployment(
-        w3, tx_hash, ARTIFACT_PATH, admin=admin, aggregator=aggregator
-    )
-    return w3, registry, context, admin, aggregator, other
+def deployed(deployment):
+    d = deployment
+    return d.w3, d.registry, d.context, d.admin, d.aggregator, d.attacker, d
 
 
 @pytest.mark.chain
 def test_capture_records_live_deployment_identity(deployed):
-    w3, registry, context, admin, aggregator, _ = deployed
+    w3, registry, context, admin, aggregator, _, _ = deployed
     receipt = w3.eth.get_transaction_receipt(context.deployment_tx_hash)
     code = w3.eth.get_code(registry.address)
     assert context.chain_id == w3.eth.chain_id
@@ -239,7 +312,7 @@ def test_capture_records_live_deployment_identity(deployed):
 
 @pytest.mark.chain
 def test_capture_rejects_unprivileged_aggregator_and_non_creation(deployed):
-    w3, _, context, admin, _, other = deployed
+    w3, _, context, admin, _, other, _ = deployed
     with pytest.raises(chain.DeploymentContextError, match="AGGREGATOR_ROLE"):
         chain.capture_deployment(
             w3, context.deployment_tx_hash, ARTIFACT_PATH, admin=admin, aggregator=other
@@ -288,15 +361,15 @@ def test_capture_rejects_unprivileged_aggregator_and_non_creation(deployed):
     ids=["wrong-chain", "no-bytecode", "unknown-tx", "block-hash", "block-number"],
 )
 def test_wrong_context_is_rejected_for_audit(deployed, change, message):
-    w3, _, context, _, _, other = deployed
+    w3, _, context, _, _, other, _ = deployed
     with pytest.raises(chain.DeploymentContextError, match=message):
         chain.validate_deployment(w3, change(context, other), ARTIFACT_PATH)
 
 
 @pytest.mark.chain
-def test_other_registry_with_same_code_is_rejected(deployed):
-    w3, _, context, admin, aggregator, _ = deployed
-    _, second = _deploy(w3, admin, aggregator)
+def test_other_registry_with_same_code_is_rejected(deployed, new_registry):
+    w3, _, context, _, _, _, _ = deployed
+    _, second = new_registry(w3)
     wrong = replace(context, registry_address=second.address)
     with pytest.raises(chain.DeploymentContextError, match="did not create"):
         chain.validate_deployment(w3, wrong, ARTIFACT_PATH)
@@ -304,26 +377,31 @@ def test_other_registry_with_same_code_is_rejected(deployed):
 
 @pytest.mark.chain
 def test_replaced_runtime_code_is_rejected(deployed):
-    w3, registry, context, _, _, _ = deployed
+    w3, registry, context, _, _, _, _ = deployed
     _rpc(w3, "anvil_setCode", registry.address, "0x6000")
     with pytest.raises(chain.DeploymentContextError, match="runtime code"):
         chain.validate_deployment(w3, context, ARTIFACT_PATH)
 
 
 @pytest.mark.chain
-def test_chain_reset_and_identical_redeploy_is_rejected():
-    w3 = chain.connect(os.environ["RPC_URL"])
-    admin, aggregator = w3.eth.accounts[:2]
+def test_chain_reset_and_identical_redeploy_is_rejected(
+    chain_w3, anvil_node, new_registry
+):
+    w3 = chain_w3
     snapshot = _rpc(w3, "evm_snapshot")
-    tx_hash, registry = _deploy(w3, admin, aggregator)
+    tx_hash, registry = new_registry(w3)
     context = chain.capture_deployment(
-        w3, tx_hash, ARTIFACT_PATH, admin=admin, aggregator=aggregator
+        w3,
+        tx_hash,
+        ARTIFACT_PATH,
+        admin=anvil_node.admin.address,
+        aggregator=anvil_node.aggregator.address,
     )
     assert _rpc(w3, "evm_revert", snapshot) is True
     with pytest.raises(chain.DeploymentContextError, match="no contract code"):
         chain.validate_deployment(w3, context, ARTIFACT_PATH)
     _rpc(w3, "evm_increaseTime", 3600)
-    _, redeployed = _deploy(w3, admin, aggregator)
+    _, redeployed = new_registry(w3)
     assert redeployed.address == registry.address  # same sender nonce, same code
     with pytest.raises(chain.DeploymentContextError, match=r"block|not found"):
         chain.validate_deployment(w3, context, ARTIFACT_PATH)
@@ -331,7 +409,7 @@ def test_chain_reset_and_identical_redeploy_is_rejected():
 
 @pytest.mark.chain
 def test_writer_must_be_recorded_aggregator_with_current_role(deployed):
-    w3, registry, context, admin, aggregator, other = deployed
+    w3, registry, context, admin, aggregator, other, _ = deployed
     with pytest.raises(chain.DeploymentContextError, match="not the recorded"):
         chain.validate_deployment(w3, context, ARTIFACT_PATH, writer=other)
     role = registry.functions.AGGREGATOR_ROLE().call()
@@ -354,7 +432,7 @@ def test_ingest_and_audit_in_valid_context(deployed, tmp_path):
             w3,
             context,
             ARTIFACT_PATH,
-            os.environ["AGGREGATOR_PRIVATE_KEY"],
+            deployed[6].aggregator_key,
             tmp_path / "results.csv",
         )
         assert summary.newly_confirmed == 1
@@ -368,7 +446,7 @@ def test_ingest_and_audit_in_valid_context(deployed, tmp_path):
 
 @pytest.mark.chain
 def test_wrong_signer_and_wrong_deployment_have_no_effects(deployed, tmp_path):
-    w3, registry, context, _, _, other = deployed
+    w3, registry, context, _, _, other, _ = deployed
     conn = db.connect(tmp_path / "readings.sqlite")
     key = record_key(*IDENTITY)
     try:
@@ -379,7 +457,7 @@ def test_wrong_signer_and_wrong_deployment_have_no_effects(deployed, tmp_path):
                 w3,
                 context,
                 ARTIFACT_PATH,
-                os.environ["ATTACKER_PRIVATE_KEY"],
+                deployed[6].attacker_key,
                 tmp_path / "results.csv",
             )
         wrong = replace(context, registry_address=other)
@@ -390,7 +468,7 @@ def test_wrong_signer_and_wrong_deployment_have_no_effects(deployed, tmp_path):
                 w3,
                 wrong,
                 ARTIFACT_PATH,
-                os.environ["AGGREGATOR_PRIVATE_KEY"],
+                deployed[6].aggregator_key,
                 tmp_path / "results.csv",
             )
         assert db.get_reading(conn, *IDENTITY) is None
