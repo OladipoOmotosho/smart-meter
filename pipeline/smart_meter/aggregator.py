@@ -85,3 +85,18 @@ def ingest(
             note=tx.tx_hash,
         )
     return IngestSummary(attempted, newly_confirmed, reconciled)
+
+
+def ingest_in_context(
+    readings: Iterable[Reading],
+    conn: sqlite3.Connection,
+    w3: Web3,
+    context: chain.DeploymentContext,
+    artifact_path: Path,
+    aggregator_key: str,
+    results_path: Path,
+) -> IngestSummary:
+    """Validate deployment, code and signer role before any storage or chain effect."""
+    signer = w3.eth.account.from_key(aggregator_key).address
+    contract = chain.validate_deployment(w3, context, artifact_path, writer=signer)
+    return ingest(readings, conn, w3, contract, aggregator_key, results_path)
