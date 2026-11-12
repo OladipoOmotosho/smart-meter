@@ -1,4 +1,10 @@
-"""Enforce design §10 branch coverage for critical Python modules."""
+"""Enforce design §10 branch coverage for critical Python modules.
+
+`chain.py` is deliberately not listed: its deployment-validation and transaction
+paths need a live node, so they run only in the separate `chain` suite, which
+this fast-suite coverage data does not include. Those paths are guarded by the
+chain tests and by `scripts/broken_controls.py` instead.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +15,14 @@ from pathlib import Path
 
 from coverage import Coverage
 
-CRITICAL = ("dataset.py", "fingerprint.py", "aggregator.py", "verifier.py")
+CRITICAL = (
+    "dataset.py",
+    "fingerprint.py",
+    "aggregator.py",
+    "verifier.py",
+    "db.py",
+    "runs.py",
+)
 
 
 def main() -> int:

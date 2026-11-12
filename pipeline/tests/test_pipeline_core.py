@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import pytest
+from helpers import Registry
 from smart_meter import chain, db
 from smart_meter.aggregator import ingest
 from smart_meter.fingerprint import digest, record_key
@@ -10,34 +11,6 @@ from smart_meter.models import Reading, Verdict
 from smart_meter.verifier import verify
 
 READING = Reading("M1", "2022-01-01T00:00:00Z", 60)
-
-
-class ReadCall:
-    def __init__(self, registry, key):
-        self.registry, self.key = registry, key
-
-    def call(self):
-        if self.registry.error:
-            raise OSError("RPC unavailable")
-        return (self.registry.entries.get(self.key, bytes(32)), 1, "writer")
-
-
-class Functions:
-    def __init__(self, registry):
-        self.registry = registry
-
-    def getCommitment(self, key):
-        return ReadCall(self.registry, key)
-
-    def commit(self, key, value):
-        return key, value
-
-
-class Registry:
-    def __init__(self):
-        self.entries = {}
-        self.error = False
-        self.functions = Functions(self)
 
 
 @pytest.fixture
@@ -50,17 +23,42 @@ def local(tmp_path):
         conn.close()
 
 
+TX_HASH = "0x" + "12" * 32
+SENDER = "0x" + "11" * 20
+
+
 def _tx(state, status=None):
-    return chain.TxResult("0x1234", "0xsender", 0, state, "fake", status=status)
+    return chain.TxResult(TX_HASH, SENDER, 0, state, "fake", status=status)
+
+
+def _fake_chain(monkeypatch, registry, outcome):
+    """Fake prepare_tx/broadcast: `outcome(key, value)` returns a TxResult."""
+
+    def prepare(_w3, call, _key, **_):
+        _fake_chain.pending = call
+        return chain.PreparedTx(TX_HASH, SENDER, 0, b"signed")
+
+    def broadcast(_w3, prepared, **_):
+        return outcome(*_fake_chain.pending)
+
+    monkeypatch.setattr(chain, "prepare_tx", prepare)
+    monkeypatch.setattr(chain, "broadcast", broadcast)
+
+
+def _no_writes(monkeypatch):
+    def fail(*_args, **_kwargs):
+        pytest.fail("unexpected write")
+
+    monkeypatch.setattr(chain, "prepare_tx", fail)
+    monkeypatch.setattr(chain, "broadcast", fail)
 
 
 def _send_success(monkeypatch, registry):
-    def send(_w3, call, _key):
-        key, value = call
+    def succeed(key, value):
         registry.entries[key] = value
         return _tx(chain.TxState.SUCCEEDED, 1)
 
-    monkeypatch.setattr(chain, "send_tx", send)
+    _fake_chain(monkeypatch, registry, succeed)
 
 
 def _ingest(local, reading=READING):
@@ -82,7 +80,7 @@ def test_new_commit_and_identical_resume_use_one_anchor(local, monkeypatch):
 
 def test_local_conflict_stops_before_chain_write(local, monkeypatch):
     db.insert_reading(local[0], replace(READING, value_wh=61))
-    monkeypatch.setattr(chain, "send_tx", lambda *_: pytest.fail("unexpected write"))
+    _no_writes(monkeypatch)
     with pytest.raises(ValueError, match="conflicting stored"):
         _ingest(local)
 
@@ -91,7 +89,7 @@ def test_chain_conflict_stops_before_chain_write(local, monkeypatch):
     local[1].entries[record_key(READING.meter_id, READING.interval_start)] = (
         bytes.fromhex("11" * 32)
     )
-    monkeypatch.setattr(chain, "send_tx", lambda *_: pytest.fail("unexpected write"))
+    _no_writes(monkeypatch)
     with pytest.raises(ValueError, match="conflicting registry"):
         _ingest(local)
 
@@ -119,7 +117,7 @@ def test_ingestion_rejects_wrong_unit_or_interval(local, reading):
 def test_ingestion_rejects_invalid_identity_before_side_effects(
     local, monkeypatch, reading
 ):
-    monkeypatch.setattr(chain, "send_tx", lambda *_: pytest.fail("unexpected write"))
+    _no_writes(monkeypatch)
 
     with pytest.raises(ValueError, match=r"valid meter ID|canonical hourly UTC"):
         _ingest(local, reading)
@@ -129,28 +127,34 @@ def test_ingestion_rejects_invalid_identity_before_side_effects(
 
 
 def test_status_zero_never_confirms(local, monkeypatch):
-    monkeypatch.setattr(chain, "send_tx", lambda *_: _tx(chain.TxState.REVERTED, 0))
-    with pytest.raises(chain.TransactionReverted, match="transaction reverted"):
-        _ingest(local)
+    _fake_chain(monkeypatch, local[1], lambda *_: _tx(chain.TxState.REVERTED, 0))
+    summary = _ingest(local)
+    assert (summary.newly_confirmed, summary.failed, summary.uncertain) == (0, 1, 0)
+    assert not summary.complete
+    key = record_key(READING.meter_id, READING.interval_start)
+    assert db.get_submission(local[0], "default", key).state.value == "FAILED"
+    (attempt,) = db.attempts(local[0], "default", key)
+    assert (attempt.tx_hash, attempt.receipt_status) == (TX_HASH, 0)
     assert local[1].entries == {}
     assert not (local[2] / "results.csv").exists()
 
 
 def test_uncertain_submission_never_confirms(local, monkeypatch):
-    monkeypatch.setattr(chain, "send_tx", lambda *_: _tx(chain.TxState.UNCERTAIN))
-    with pytest.raises(chain.SubmissionUncertain) as caught:
-        _ingest(local)
-    assert caught.value.result.tx_hash == "0x1234"
+    _fake_chain(monkeypatch, local[1], lambda *_: _tx(chain.TxState.UNCERTAIN))
+    summary = _ingest(local)
+    assert (summary.newly_confirmed, summary.failed, summary.uncertain) == (0, 0, 1)
+    key = record_key(READING.meter_id, READING.interval_start)
+    assert db.get_submission(local[0], "default", key).state.value == "UNCERTAIN"
     assert local[1].entries == {}
     assert not (local[2] / "results.csv").exists()
 
 
 def test_mismatching_confirmation_never_confirms(local, monkeypatch):
-    def wrong(_w3, call, _key):
-        local[1].entries[call[0]] = bytes.fromhex("22" * 32)
+    def wrong(key, _value):
+        local[1].entries[key] = bytes.fromhex("22" * 32)
         return _tx(chain.TxState.SUCCEEDED, 1)
 
-    monkeypatch.setattr(chain, "send_tx", wrong)
+    _fake_chain(monkeypatch, local[1], wrong)
     with pytest.raises(ValueError, match="confirmation mismatch"):
         _ingest(local)
 
