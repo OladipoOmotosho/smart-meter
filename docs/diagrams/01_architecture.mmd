@@ -14,7 +14,7 @@ flowchart TB
     subgraph SRC["1. Data source layer"]
         direction TB
         DS[("AMPds2 dataset<br/>CSV, 1-minute household data")]
-        SIM["Meter simulator<br/>Python + pandas<br/>replays rows as meter readings:<br/>meter_id, interval_start, value, unit, seq"]
+        SIM["WHE loader (Python, exact rational arithmetic)<br/>integrates 60 one-minute P samples<br/>into hourly Wh readings:<br/>meter_id, interval_start, value_wh, unit, seq"]
         DS --> SIM
     end
 
@@ -24,8 +24,10 @@ flowchart TB
         RKEY["Record key<br/>SHA-256 of meter_id + interval_start"]
         HASH["Fingerprint<br/>SHA-256 of canonical bytes"]
         BATCH["Batch builder (extension)<br/>one digest per interval"]
-        W3A["web3.py client<br/>signs transactions with the<br/>aggregator account key"]
+        W3A["web3.py client<br/>validates deployment context, signs,<br/>journals tx identity before broadcast,<br/>reconciles uncertain outcomes"]
+        MAN[("Run manifest + expected_records.json<br/>source checksum, conversion policy,<br/>deployment context, expected keys")]
         SER --> RKEY
+        RKEY --> MAN
         SER --> HASH
         RKEY --> W3A
         HASH --> W3A
@@ -34,7 +36,7 @@ flowchart TB
     end
 
     subgraph OFF["3. Off-chain storage (untrusted: insider risk)"]
-        DB[("SQLite utility database<br/>table readings:<br/>record_id, meter_id, interval_start,<br/>value, unit, seq, stored_at")]
+        DB[("SQLite utility database (schema v1)<br/>readings: record_id, meter_id, interval_start,<br/>value_wh, unit, seq, stored_at<br/>submissions + submission_attempts journal")]
     end
 
     subgraph CHAIN["4. Blockchain layer: Anvil local Ethereum dev node (chain id 31337)"]
@@ -50,22 +52,25 @@ flowchart TB
 
     subgraph AUD["5. Auditor (Python + web3.py)"]
         direction TB
-        RD["Read stored record<br/>from SQLite"]
+        VAL["Validate manifest and<br/>deployment context"]
+        RD["Read each expected record<br/>from SQLite (read-only)"]
         RC["Re-serialize and<br/>recompute SHA-256"]
         CMP{"Recomputed digest equals<br/>on-chain digest?"}
         OK["VERIFIED"]
         BAD["TAMPERED"]
-        MISS["MISSING commitment"]
-        RD --> RC --> CMP
+        MISS["MISSING_RECORD / MISSING_COMMITMENT<br/>/ MISSING_BOTH"]
+        ERR["ERROR<br/>unreadable record, RPC or context failure"]
+        VAL --> RD --> RC --> CMP
+        VAL -->|context invalid| ERR
         CMP -->|yes| OK
         CMP -->|no| BAD
-        CMP -->|no commitment found| MISS
+        CMP -->|record or commitment absent| MISS
     end
 
     subgraph EVAL["6. Evaluation"]
         direction TB
         LOG[("Results log, CSV / JSON<br/>verdicts, submit and verify latency,<br/>gasUsed per transaction")]
-        CH["matplotlib charts<br/>detection and false alarms,<br/>latency, gas per record vs batch"]
+        CH["evaluate.py<br/>explicit denominators, median and<br/>nearest-rank p95, labelled projections"]
         LOG --> CH
     end
 
@@ -92,6 +97,8 @@ flowchart TB
     OK --> LOG
     BAD --> LOG
     MISS --> LOG
+    ERR --> LOG
+    MAN -->|expected keys| VAL
 
     %% Attacks and boundary test
     A1 -.->|edits stored row| DB
@@ -120,11 +127,11 @@ flowchart TB
     class DS,SIM src
     class SER,RKEY,HASH,W3A trusted
     class BATCH ext
-    class DB,LOG,ST store
+    class DB,LOG,ST,MAN store
     class SC,AC,FN chain
-    class RD,RC,CMP,CH audit
+    class RD,RC,CMP,CH,VAL audit
     class OK ok
-    class BAD bad
+    class BAD,ERR bad
     class MISS warn
     class A1,A2,A3,A4 attack
     class FG,GH tool

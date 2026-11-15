@@ -1,0 +1,293 @@
+{
+  "provenance": {
+    "code_revision": "4a92c8274ea7c9adcda972c21d948a5ccf72b5cb",
+    "dirty": true,
+    "source_checksums_before": {
+      "Electricity_WHE.csv": "b33fb7f1e3acf21d8dfe8876102965ec8872a5ce9142a8a400ed29f012a19964",
+      "Electricity_P.csv": "c5564ba459b74b3df4ca6379769f953526ea3e00cc214f6d8bb914dd8fc11fad"
+    },
+    "foundry": "forge Version: 1.9.0",
+    "anvil": "anvil Version: 1.9.0",
+    "command": "python -m smart_meter.experiment --output /Users/oladipo/myJourney/smart-meter/docs/evidence/2026-11-14",
+    "selection": "one AMPds2 WHE channel; 24 hourly intervals, 2012-04-01T07:00:00Z to 2012-04-02T07:00:00Z",
+    "code_sha256": {
+      "pipeline/smart_meter/__init__.py": "5cf1be483a7c5ced3bf8dd224f2cac3adb28e70f08cf139b2b3c78001216fbd0",
+      "pipeline/smart_meter/aggregator.py": "8b348fc85facf22e1ae950c3adcdccc29b8d3d7de4975ee009bdede138ef11a6",
+      "pipeline/smart_meter/chain.py": "dd3367466d81346bcfc4bc022d0bfd88719b7b2e209a8611ee841b8483ff6e55",
+      "pipeline/smart_meter/config.py": "2faa4d5632b8f0df4563a890939130a875db4dde10b31d52febcd20fc9e8b2d2",
+      "pipeline/smart_meter/dataset.py": "1b574a1bf4c8e1dceaa93556b1d8fe54ba6d8ec989cc9f1d1d7336734c0538ef",
+      "pipeline/smart_meter/db.py": "128b4ed4fc65108a8b9464f541c2de64de8dbc2ce8b55c87a30e838e20d70386",
+      "pipeline/smart_meter/demo.py": "ed5d6c73240a20856cfd64e0c7a91d55879d684185723a36f9cd56878fdd55d4",
+      "pipeline/smart_meter/evaluate.py": "20e83dea4ea190eebc53b21c03ce64b11fd5c99fc17c38794a6d8c55ecd228ff",
+      "pipeline/smart_meter/experiment.py": "aee457908e697197a1fbb82e7b2ae5b5a6a91821031170e64fbf4920061da875",
+      "pipeline/smart_meter/fingerprint.py": "7a641340a2e53e52c44bf5dc85e78aeb00efcdacd2866a7aebad8c6afceb7d7a",
+      "pipeline/smart_meter/local_chain.py": "13e28fda9c0a1dfdcc24e417bfcdf941ef9f4e2fc67743c53437153f23a2dc57",
+      "pipeline/smart_meter/models.py": "0fe93597ba0fe5ba5db15e675c077f4e48a858dd1c0f255ee59bd71b4686ac98",
+      "pipeline/smart_meter/results.py": "845405f1ad1d859fa2b32146103180d7fe92eed7b4d0b0c775a769f00ec5091e",
+      "pipeline/smart_meter/runs.py": "fbece2acca66935e080369a1588efb5bac48ca19dbb658e7f53a0d5ce17c1b24",
+      "pipeline/smart_meter/scenarios.py": "52b8df49cefbc34d1dde426188ad37e1681abd35961258da8aff16348a122aae",
+      "pipeline/smart_meter/verifier.py": "0d79e492dc2c88fbb3c6b54f6403df491ee23cf5cbd57caddbef3efa00417e71"
+    },
+    "source_checksums_after": {
+      "Electricity_WHE.csv": "b33fb7f1e3acf21d8dfe8876102965ec8872a5ce9142a8a400ed29f012a19964",
+      "Electricity_P.csv": "c5564ba459b74b3df4ca6379769f953526ea3e00cc214f6d8bb914dd8fc11fad"
+    }
+  },
+  "runs": [
+    {
+      "run": 1,
+      "ingestion": {
+        "attempted": 24,
+        "newly_confirmed": 24,
+        "reconciled": 0,
+        "failed": 0,
+        "uncertain": 0
+      },
+      "resume": {
+        "attempted": 24,
+        "newly_confirmed": 0,
+        "reconciled": 24,
+        "failed": 0,
+        "uncertain": 0
+      },
+      "metrics": {
+        "records": 48,
+        "outcomes": {
+          "": 24,
+          "VERIFIED": 24
+        },
+        "detection": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "false_alarms": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "rejections": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "errors": 0,
+        "uncertain": 0,
+        "failed": 0,
+        "precommit_limit_cases": 0,
+        "excluded_from_detection": 0,
+        "commit_seconds": {
+          "n": 24,
+          "median": 0.001219,
+          "p95": 0.001634
+        },
+        "audit_seconds": {
+          "n": 24,
+          "median": 0.0022305,
+          "p95": 0.002966
+        },
+        "commit_gas": {
+          "n": 24,
+          "median": 72577.0,
+          "p95": 72577.0
+        },
+        "timing_exclusions": {
+          "commit": 0,
+          "audit": 0
+        },
+        "conditions": "serial local Anvil; receipt observation, not public-chain finality; p95 nearest rank"
+      }
+    },
+    {
+      "run": 2,
+      "ingestion": {
+        "attempted": 24,
+        "newly_confirmed": 24,
+        "reconciled": 0,
+        "failed": 0,
+        "uncertain": 0
+      },
+      "resume": {
+        "attempted": 24,
+        "newly_confirmed": 0,
+        "reconciled": 24,
+        "failed": 0,
+        "uncertain": 0
+      },
+      "metrics": {
+        "records": 48,
+        "outcomes": {
+          "": 24,
+          "VERIFIED": 24
+        },
+        "detection": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "false_alarms": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "rejections": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "errors": 0,
+        "uncertain": 0,
+        "failed": 0,
+        "precommit_limit_cases": 0,
+        "excluded_from_detection": 0,
+        "commit_seconds": {
+          "n": 24,
+          "median": 0.001096,
+          "p95": 0.001627
+        },
+        "audit_seconds": {
+          "n": 24,
+          "median": 0.002076,
+          "p95": 0.002189
+        },
+        "commit_gas": {
+          "n": 24,
+          "median": 72577.0,
+          "p95": 72577.0
+        },
+        "timing_exclusions": {
+          "commit": 0,
+          "audit": 0
+        },
+        "conditions": "serial local Anvil; receipt observation, not public-chain finality; p95 nearest rank"
+      }
+    },
+    {
+      "run": 3,
+      "ingestion": {
+        "attempted": 24,
+        "newly_confirmed": 24,
+        "reconciled": 0,
+        "failed": 0,
+        "uncertain": 0
+      },
+      "resume": {
+        "attempted": 24,
+        "newly_confirmed": 0,
+        "reconciled": 24,
+        "failed": 0,
+        "uncertain": 0
+      },
+      "metrics": {
+        "records": 48,
+        "outcomes": {
+          "": 24,
+          "VERIFIED": 24
+        },
+        "detection": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "false_alarms": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "rejections": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "errors": 0,
+        "uncertain": 0,
+        "failed": 0,
+        "precommit_limit_cases": 0,
+        "excluded_from_detection": 0,
+        "commit_seconds": {
+          "n": 24,
+          "median": 0.0011475,
+          "p95": 0.001336
+        },
+        "audit_seconds": {
+          "n": 24,
+          "median": 0.002502,
+          "p95": 0.003319
+        },
+        "commit_gas": {
+          "n": 24,
+          "median": 72577.0,
+          "p95": 72577.0
+        },
+        "timing_exclusions": {
+          "commit": 0,
+          "audit": 0
+        },
+        "conditions": "serial local Anvil; receipt observation, not public-chain finality; p95 nearest rank"
+      }
+    }
+  ],
+  "pooled": {
+    "records": 156,
+    "outcomes": {
+      "": 72,
+      "ERROR": 1,
+      "MISSING_BOTH": 1,
+      "MISSING_COMMITMENT": 1,
+      "MISSING_RECORD": 1,
+      "RECONCILED": 1,
+      "REJECTED": 3,
+      "REVERTED": 1,
+      "TAMPERED": 1,
+      "VERIFIED": 74
+    },
+    "detection": {
+      "numerator": 2,
+      "denominator": 2,
+      "rate": 1.0
+    },
+    "false_alarms": {
+      "numerator": 0,
+      "denominator": 1,
+      "rate": 0.0
+    },
+    "rejections": {
+      "numerator": 3,
+      "denominator": 3,
+      "rate": 1.0
+    },
+    "errors": 1,
+    "uncertain": 0,
+    "failed": 4,
+    "precommit_limit_cases": 1,
+    "excluded_from_detection": 10,
+    "commit_seconds": {
+      "n": 72,
+      "median": 0.001173,
+      "p95": 0.001627
+    },
+    "audit_seconds": {
+      "n": 72,
+      "median": 0.0022255,
+      "p95": 0.003139
+    },
+    "commit_gas": {
+      "n": 72,
+      "median": 72577.0,
+      "p95": 72577.0
+    },
+    "timing_exclusions": {
+      "commit": 0,
+      "audit": 0
+    },
+    "conditions": "serial local Anvil; receipt observation, not public-chain finality; p95 nearest rank"
+  },
+  "projection": {
+    "label": "hypothetical one-record-per-transaction projection, not measured throughput",
+    "meters": 1000,
+    "interval_minutes": 60,
+    "transactions_per_day": 24000.0,
+    "gas_per_day": 1741848000.0
+  },
+  "limitations": "Three descriptive local runs, not statistical proof or public-network performance. Anvil and manifest share an operator. A4 is outside post-commit detection."
+}

@@ -162,6 +162,18 @@ def _parse_expected(content: bytes) -> tuple[ExpectedRecord, ...]:
     keys = [r.record_key for r in records]
     if len(set(keys)) != len(keys) or any(len(k) != 32 for k in keys):
         raise IncompatibleRun("expected records contain duplicate or malformed keys")
+    for r in records:
+        if (
+            not isinstance(r.meter_id, str)
+            or not isinstance(r.interval_start, str)
+            or type(r.seq) is not int
+            or r.seq < 0
+            or len(r.digest) != 32
+            or record_key(r.meter_id, r.interval_start) != r.record_key
+        ):
+            raise IncompatibleRun(
+                "expected record identity, key or digest is malformed"
+            )
     return records
 
 
@@ -295,6 +307,10 @@ def load_expected(paths: RunPaths) -> tuple[ExpectedRecord, ...]:
         raise IncompatibleRun(f"run files missing: {error.filename}") from error
     except (OSError, ValueError) as error:
         raise IncompatibleRun(f"run files unreadable: {error}") from error
+    if not isinstance(manifest, dict) or not isinstance(
+        manifest.get("expected_records"), dict
+    ):
+        raise IncompatibleRun("manifest expected-record reference must be an object")
     if hashlib.sha256(content).hexdigest() != manifest.get("expected_records", {}).get(
         "sha256"
     ):

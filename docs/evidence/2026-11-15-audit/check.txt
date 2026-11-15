@@ -1,0 +1,184 @@
+All checks passed!
+45 files already formatted
+No files changed, compilation skipped
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-8.4.2, pluggy-1.7.0
+rootdir: /Users/oladipo/myJourney/smart-meter/pipeline
+configfile: pytest.ini
+testpaths: tests
+plugins: hypothesis-6.170.15
+collected 301 items / 44 deselected / 257 selected
+
+tests/test_audit_run.py ........................                         [  9%]
+tests/test_check_harness.py ....                                         [ 10%]
+tests/test_config.py ....                                                [ 12%]
+tests/test_dataset.py .......................                            [ 21%]
+tests/test_demo.py ..........                                            [ 25%]
+tests/test_deployment.py ............................                    [ 36%]
+tests/test_evaluate.py .............                                     [ 41%]
+tests/test_fingerprint.py .........                                      [ 44%]
+tests/test_fingerprint_contract.py .................                     [ 51%]
+tests/test_fixtures.py .                                                 [ 51%]
+tests/test_ingestion.py .......................                          [ 60%]
+tests/test_journal.py .............................                      [ 71%]
+tests/test_mutation_harness.py ....                                      [ 73%]
+tests/test_pipeline_core.py .............................                [ 84%]
+tests/test_recovery.py ......                                            [ 87%]
+tests/test_runs.py ..................                                    [ 94%]
+tests/test_transactions.py ...............                               [100%]
+
+=============================== warnings summary ===============================
+../../../../../private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+---- generated xml file: /private/tmp/smart-meter-audit15-verified/unit.xml ----
+================ 257 passed, 44 deselected, 1 warning in 2.95s =================
+unit: 257 collected; 0 report problems
+No files changed, compilation skipped
+
+Ran 19 tests for test/MeterCommitmentRegistry.t.sol:MeterCommitmentRegistryTest
+[PASS] testFuzz_FirstCommitRemainsFixed(bytes32,bytes32,bytes32) (runs: 256, μ: 137975, ~: 138339)
+[PASS] test_AdminHasNoImplicitWriterRole() (gas: 46122)
+[PASS] test_AdminRenounceFreezesWriterSet() (gas: 202707)
+[PASS] test_AggregatorCanCommit() (gas: 86918)
+[PASS] test_DefaultAdminAdministersWriterRole() (gas: 47495)
+[PASS] test_EmitsCommittedEvent() (gas: 90999)
+[PASS] test_GetCommitmentReturnsStoredValues() (gas: 93478)
+[PASS] test_RenounceRoleOnlyByHolderAndBlocksFutureWrites() (gas: 219071)
+[PASS] test_RevertWhen_KeyAlreadyCommitted() (gas: 146802)
+[PASS] test_RevertWhen_TimestampExceedsUint64() (gas: 57648)
+[PASS] test_RevertWhen_UnauthorizedCommit() (gas: 60390)
+[PASS] test_RevertWhen_ZeroDigest() (gas: 53113)
+[PASS] test_RevocationBlocksFutureWritesButPreservesPast() (gas: 171305)
+[PASS] test_SecondWriterCannotReuseKeyWithEitherDigest() (gas: 217504)
+[PASS] test_SupportsOnlyDeclaredInterfaces() (gas: 18561)
+[PASS] test_UnknownKeyIsEmpty() (gas: 20398)
+[PASS] test_WriterCannotGrantOrRevokeWriterRole() (gas: 100591)
+[PASS] test_ZeroAdminRejected() (gas: 155675)
+[PASS] test_ZeroKeyIsValid() (gas: 138793)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 4.21ms (9.85ms CPU time)
+
+Ran 1 test for test/MeterCommitmentRegistryInvariant.t.sol:MeterCommitmentRegistryInvariantTest
+[PASS] invariant_RegistryMatchesFirstCommitAndRoleModel() (runs: 128, calls: 4096, reverts: 0)
+
+╭-----------------+-----------+-------+---------+----------╮
+| Contract        | Selector  | Calls | Reverts | Discards |
++==========================================================+
+| RegistryHandler | setWriter | 2023  | 0       | 0        |
+|-----------------+-----------+-------+---------+----------|
+| RegistryHandler | submit    | 2073  | 0       | 0        |
+╰-----------------+-----------+-------+---------+----------╯
+
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 643.06ms (641.87ms CPU time)
+
+Ran 2 test suites in 643.78ms (647.27ms CPU time): 20 tests passed, 0 failed, 0 skipped (20 total tests)
+contracts: 20 reported; 0 report problems
+No files changed, compilation skipped
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-8.4.2, pluggy-1.7.0
+rootdir: /Users/oladipo/myJourney/smart-meter/pipeline
+configfile: pytest.ini
+testpaths: tests
+collected 301 items / 257 deselected / 44 selected
+
+tests/test_attacks.py ...........                                        [ 25%]
+tests/test_audit_run.py .                                                [ 27%]
+tests/test_chain_boundary.py ..                                          [ 31%]
+tests/test_demo.py ...                                                   [ 38%]
+tests/test_deployment.py ..............                                  [ 70%]
+tests/test_fixtures.py ...                                               [ 77%]
+tests/test_ingestion.py ....                                             [ 86%]
+tests/test_recovery.py .                                                 [ 88%]
+tests/test_transactions.py .....                                         [100%]
+
+=============================== warnings summary ===============================
+../../../../../private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /private/tmp/smart-meter-audit15-verified/integration.xml -
+================ 44 passed, 257 deselected, 1 warning in 6.33s =================
+chain: 44 collected; 0 report problems
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-8.4.2, pluggy-1.7.0
+rootdir: /Users/oladipo/myJourney/smart-meter/pipeline
+configfile: pytest.ini
+testpaths: tests
+plugins: hypothesis-6.170.15
+collected 301 items / 44 deselected / 257 selected
+
+tests/test_audit_run.py ........................                         [  9%]
+tests/test_check_harness.py ....                                         [ 10%]
+tests/test_config.py ....                                                [ 12%]
+tests/test_dataset.py .......................                            [ 21%]
+tests/test_demo.py ..........                                            [ 25%]
+tests/test_deployment.py ............................                    [ 36%]
+tests/test_evaluate.py .............                                     [ 41%]
+tests/test_fingerprint.py .........                                      [ 44%]
+tests/test_fingerprint_contract.py .................                     [ 51%]
+tests/test_fixtures.py .                                                 [ 51%]
+tests/test_ingestion.py .......................                          [ 60%]
+tests/test_journal.py .............................                      [ 71%]
+tests/test_mutation_harness.py ....                                      [ 73%]
+tests/test_pipeline_core.py .............................                [ 84%]
+tests/test_recovery.py ......                                            [ 87%]
+tests/test_runs.py ..................                                    [ 94%]
+tests/test_transactions.py ...............                               [100%]
+
+=============================== warnings summary ===============================
+../../../../../private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 257 passed, 44 deselected, 1 warning in 4.40s =================
+No files changed, compilation skipped
+============================= test session starts ==============================
+platform darwin -- Python 3.12.14, pytest-8.4.2, pluggy-1.7.0
+rootdir: /Users/oladipo/myJourney/smart-meter/pipeline
+configfile: pytest.ini
+testpaths: tests
+collected 301 items / 257 deselected / 44 selected
+
+tests/test_attacks.py ...........                                        [ 25%]
+tests/test_audit_run.py .                                                [ 27%]
+tests/test_chain_boundary.py ..                                          [ 31%]
+tests/test_demo.py ...                                                   [ 38%]
+tests/test_deployment.py ..............                                  [ 70%]
+tests/test_fixtures.py ...                                               [ 77%]
+tests/test_ingestion.py ....                                             [ 86%]
+tests/test_recovery.py .                                                 [ 88%]
+tests/test_transactions.py .....                                         [100%]
+
+=============================== warnings summary ===============================
+../../../../../private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /private/tmp/smart-meter-audit15-verified/coverage-chain.xml -
+================ 44 passed, 257 deselected, 1 warning in 7.42s =================
+chain: 44 collected; 0 report problems
+Name                         Stmts   Miss Branch BrPart  Cover   Missing
+------------------------------------------------------------------------
+smart_meter/__init__.py          0      0      0      0   100%
+smart_meter/aggregator.py      201      0     58      0   100%
+smart_meter/chain.py           300     21     74      5    92%   100-101, 108-109, 115, 121-128, 208, 317, 334, 401-402, 416-417, 440, 486-487
+smart_meter/config.py           57      1     10      1    97%   100
+smart_meter/dataset.py         108      4     44      2    96%   44-45, 75, 104
+smart_meter/db.py              171      0     50      1    99%   239->241
+smart_meter/demo.py             83      6     20      4    90%   94-97, 103, 106, 136
+smart_meter/evaluate.py         61      1     20      1    98%   178
+smart_meter/experiment.py       63     63     18      0     0%   3-128
+smart_meter/fingerprint.py      27      0      8      0   100%
+smart_meter/local_chain.py      60      6     10      3    87%   38, 46, 76, 85-87
+smart_meter/models.py           39      0      0      0   100%
+smart_meter/results.py          21      0      8      0   100%
+smart_meter/runs.py            149      8     32      0    96%   112-113, 283-284, 287-288, 308-309
+smart_meter/scenarios.py        88      2     30      1    97%   62, 109
+smart_meter/verifier.py        105      0     32      0   100%
+------------------------------------------------------------------------
+TOTAL                         1533    112    414     18    92%

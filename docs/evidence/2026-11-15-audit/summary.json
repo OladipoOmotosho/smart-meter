@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-15",
+  "base_revision": "4a92c82",
+  "working_changes": true,
+  "suites": {
+    "unit": {
+      "tests": 257,
+      "failures": 0,
+      "skips": 0
+    },
+    "integration": {
+      "tests": 44,
+      "failures": 0,
+      "skips": 0
+    }
+  },
+  "contracts": 20,
+  "combined_coverage_percent": 92,
+  "required_controls_caught": 5,
+  "legacy_controls_caught": 23,
+  "saved_metrics_recomputed": "exact match for three runs and pooled report",
+  "raw_csv_checksums": "both match documented values",
+  "remote_ci": "not run for uncommitted changes"
+}

@@ -15,6 +15,21 @@ FIELDS = [
     "gas_used",
     "seconds",
     "note",
+    "run_id",
+    "scenario_id",
+    "record_key",
+    "expected_digest",
+    "observed_digest",
+    "committed_digest",
+    "registry_address",
+    "chain_id",
+    "block_hash",
+    "context_seconds",
+    "expected_outcome",
+    "passed",
+    "tx_hash",
+    "status",
+    "stage",
 ]
 
 
@@ -27,11 +42,19 @@ def log(
     gas_used: int | None = None,
     seconds: float | None = None,
     note: str = "",
+    **evidence: object,
 ) -> None:
     """event examples: "commit", "verify", "attack_A1", "attack_A2"."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    new_file = not path.exists()
+    unknown = set(evidence) - set(FIELDS)
+    if unknown:
+        raise ValueError(f"unknown result fields: {sorted(unknown)}")
+    new_file = not path.exists() or path.stat().st_size == 0
+    if not new_file:
+        with path.open(newline="") as existing:
+            if next(csv.reader(existing), None) != FIELDS:
+                raise ValueError("results CSV schema differs; use a new results file")
     with path.open("a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         if new_file:
@@ -46,5 +69,6 @@ def log(
                 "gas_used": "" if gas_used is None else gas_used,
                 "seconds": "" if seconds is None else f"{seconds:.6f}",
                 "note": note,
+                **evidence,
             }
         )

@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def main(report_path: Path) -> int:
+def main(report_path: Path, *, coverage: bool = False) -> int:
     with tempfile.TemporaryDirectory(prefix="smart-meter-integration-") as temporary:
         env = {
             "PATH": os.environ.get("PATH", ""),
@@ -36,9 +36,16 @@ def main(report_path: Path) -> int:
         except subprocess.CalledProcessError as error:
             print(f"Integration setup failed: {error}", file=sys.stderr)
             return 1
+        if coverage:
+            env["COVERAGE_FILE"] = str(ROOT / "pipeline" / ".coverage")
         result = subprocess.run(
             [
                 sys.executable,
+                *(
+                    ["-m", "coverage", "run", "--append", "--branch"]
+                    if coverage
+                    else []
+                ),
                 "-m",
                 "pytest",
                 "-m",
@@ -72,6 +79,6 @@ def main(report_path: Path) -> int:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         raise SystemExit("usage: run_integration.py REPORT_PATH")
-    raise SystemExit(main(Path(sys.argv[1])))
+    raise SystemExit(main(Path(sys.argv[1]), coverage="--coverage" in sys.argv[2:]))

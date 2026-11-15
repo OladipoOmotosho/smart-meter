@@ -8,6 +8,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 REQUIRED_CHAIN = {
+    "test_manifest_audit_on_real_chain_is_read_only",
+    "test_two_hour_new_resume_audit_and_findings",
+    "test_scenario_runner_exports_all_expected_outcomes",
+    "test_disposable_demo_runs_twice_and_stops_owned_node",
     "test_positive_control_clean_record_verifies",
     "test_A1_post_commit_tampering_is_detected",
     "test_A2_unauthorized_submission_is_rejected",

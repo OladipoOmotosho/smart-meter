@@ -1,0 +1,25 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_mined_status_zero_is_reverted_with_evidence _______________
+
+node = namespace(eth=<test_transactions.FakeEth object at 0x10a741ac0>)
+
+    def test_mined_status_zero_is_reverted_with_evidence(node):
+        _mine_on_send(node, 0)
+        result = chain.send_tx(node, FakeCall(), THROWAWAY_KEY)
+>       assert result.state is chain.TxState.REVERTED
+E       AssertionError: assert <TxState.SUCCEEDED: 'SUCCEEDED'> is <TxState.REVERTED: 'REVERTED'>
+E        +  where <TxState.SUCCEEDED: 'SUCCEEDED'> = TxResult(tx_hash='0x396c85561d4f8d88c699072bf9ba88d8b2c744618753e0bd374a0c8fb243a6d4', sender='0x19E7E376E7C213B7E7e7e...ber=9, block_hash='0xabababababababababababababababababababababababababababababababab', seconds=1.3125012628734112e-05).state
+E        +  and   <TxState.REVERTED: 'REVERTED'> = <enum 'TxState'>.REVERTED
+E        +    where <enum 'TxState'> = chain.TxState
+
+tests/test_transactions.py:191: AssertionError
+=============================== warnings summary ===============================
+../../../../../../../../tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_transactions.py::test_mined_status_zero_is_reverted_with_evidence
+1 failed, 1 warning in 0.06s

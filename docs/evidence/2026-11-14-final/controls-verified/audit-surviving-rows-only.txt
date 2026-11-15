@@ -1,0 +1,54 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_manifest_outcomes_and_read_only[delete-MISSING_RECORD] __________
+
+audit_setup = (RunPaths(root=PosixPath('/private/var/folders/08/frsy5l0j3g9cv79nxbz5xj840000gn/T/pytest-of-oladipo/pytest-277/test_m...ry object at 0x109429910>, namespace(eth=namespace(get_block=<function audit_setup.<locals>.<lambda> at 0x10945df80>)))
+change = 'delete', outcome = 'MISSING_RECORD'
+
+    @pytest.mark.parametrize(
+        "change,outcome",
+        [
+            ("none", "VERIFIED"),
+            ("value_wh=42", "TAMPERED"),
+            ("unit='kWh'", "TAMPERED"),
+            ("seq=99", "TAMPERED"),
+            ("meter_id='moved'", "MISSING_RECORD"),
+            ("delete", "MISSING_RECORD"),
+            ("anchors", "MISSING_COMMITMENT"),
+            ("both", "MISSING_BOTH"),
+            ("value_wh='bad'", "ERROR"),
+            ("rpc", "ERROR"),
+            ("database", "ERROR"),
+        ],
+    )
+    def test_manifest_outcomes_and_read_only(audit_setup, change, outcome):
+        paths, run, conn, registry, w3 = audit_setup
+        if change in {"delete", "both"}:
+            conn.execute("DELETE FROM readings")
+        elif "=" in change:
+            conn.execute("UPDATE readings SET " + change)
+        elif change == "rpc":
+            registry.error = True
+        if change in {"anchors", "both"}:
+            registry.entries.clear()
+        conn.commit()
+        conn.close()
+        if change == "database":
+            paths.db.unlink()
+        before = paths.db.read_bytes() if paths.db.exists() else None
+        anchors = dict(registry.entries)
+        rows = verifier.audit_run(paths, w3, Path("unused"), paths.root / "audit.csv")
+>       assert len(rows) == 3
+E       assert 0 == 3
+E        +  where 0 = len([])
+
+tests/test_audit_run.py:94: AssertionError
+=============================== warnings summary ===============================
+../../../../../../../../tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_audit_run.py::test_manifest_outcomes_and_read_only[delete-MISSING_RECORD]
+1 failed, 1 warning in 0.07s

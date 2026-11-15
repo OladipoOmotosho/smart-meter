@@ -42,7 +42,10 @@ test-integration:
 	@$(PY) scripts/check_test_report.py chain $(REPORT_DIR)/integration.xml
 
 coverage:
+	@mkdir -p $(REPORT_DIR)
 	@cd pipeline && $(PY) -m coverage run --branch -m pytest -m 'not chain' -ra -p no:cacheprovider --strict-markers
+	@$(PY) scripts/run_integration.py $(abspath $(REPORT_DIR))/coverage-chain.xml --coverage
+	@$(PY) scripts/check_test_report.py chain $(REPORT_DIR)/coverage-chain.xml
 	@cd pipeline && $(PY) -m coverage report
 	@$(PY) scripts/check_branch_coverage.py pipeline/.coverage
 
@@ -59,5 +62,4 @@ deploy:
 	  $(FORGE) script script/Deploy.s.sol:Deploy --rpc-url "$${RPC_URL:-http://127.0.0.1:8545}" --broadcast
 
 demo:
-	@echo 'Task 9.1 must replace the current demo database deletion before make demo is safe.' >&2
-	@exit 1
+	@cd pipeline && $(PY) -m smart_meter.demo demo

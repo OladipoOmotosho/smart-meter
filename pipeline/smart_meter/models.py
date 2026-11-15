@@ -48,3 +48,12 @@ class AuditResult:
     observed_digest: str | None
     committed_digest: str | None
     seconds: float
+
+    run_id: str = ""
+    meter_id: str = ""
+    interval_start: str = ""
+    expected_digest: str | None = None
+    registry_address: str = ""
+    chain_id: int | None = None
+    block_hash: str = ""
+    context_seconds: float | None = None

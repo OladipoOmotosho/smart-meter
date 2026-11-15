@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_literal_versioned_bytes_and_hashes ____________________
+
+    def test_literal_versioned_bytes_and_hashes():
+>       assert canonical_bytes(BASE) == VECTOR["canonical_ascii"].encode("ascii")
+E       assert b'["smart-met...0Z",0,"Wh",0]' == b'["smart-met...,5200,"Wh",0]'
+E         
+E         At index 62 diff: b'0' != b'5'
+E         Use -v to get more diff
+
+tests/test_fingerprint_contract.py:30: AssertionError
+=============================== warnings summary ===============================
+../../../../../../../../tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6
+  /private/tmp/smart-meter-venv-312/lib/python3.12/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_fingerprint_contract.py::test_literal_versioned_bytes_and_hashes
+1 failed, 1 warning in 0.06s

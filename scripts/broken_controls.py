@@ -13,6 +13,7 @@ Run with the project's virtual environment so pytest and dependencies resolve.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -210,8 +211,12 @@ CONTROLS = (
         AGG,
         (
             (
-                "            self._outcome(sub, SubmissionState.UNCERTAIN, **evidence)\n            self.counts.uncertain += 1\n            return False",
-                "            self._outcome(sub, SubmissionState.CONFIRMED, **evidence)\n            self.counts.newly_confirmed += 1\n            return True",
+                "state = SubmissionState.UNCERTAIN if uncertain else SubmissionState.FAILED",
+                "state = SubmissionState.CONFIRMED if uncertain else SubmissionState.FAILED",
+            ),
+            (
+                "            self.counts.uncertain += 1\n            return False",
+                "            self.counts.newly_confirmed += 1\n            return True",
             ),
         ),
         "tests/test_recovery.py::test_p8_faults_never_confirm_and_resume_commits_each_key_once",
@@ -292,7 +297,7 @@ CONTROLS = (
 )
 
 
-def _run_test(node_id: str, chain: bool) -> tuple[bool, str]:
+def _run_test(node_id: str, chain: bool) -> tuple[str, str]:
     marker = "chain" if chain else "not chain"
     result = subprocess.run(
         [
@@ -313,8 +318,17 @@ def _run_test(node_id: str, chain: bool) -> tuple[bool, str]:
         check=False,
     )
     output = result.stdout + result.stderr
-    caught = result.returncode == 1 and ("failed" in output or "error" in output)
-    return caught, output
+    if (
+        result.returncode == 0
+        and re.search(r"\b[1-9]\d* passed\b", output)
+        and not re.search(r"\b\d+ (skipped|xfailed)\b", output)
+    ):
+        return "PASS", output
+    if result.returncode == 1 and re.search(
+        r"FAILED " + re.escape(node_id) + r"(?:\[|\s|$)", output
+    ):
+        return "FAIL", output
+    return "ERROR", output
 
 
 def run_control(control: Control) -> str:
@@ -329,12 +343,14 @@ def run_control(control: Control) -> str:
         mutated = mutated.replace(old, new)
     try:
         path.write_text(mutated)
-        caught, _output = _run_test(control.test, control.chain)
+        status, _output = _run_test(control.test, control.chain)
     finally:
         path.write_bytes(original)
     if path.read_bytes() != original:
         return "RESTORE-FAILED"
-    return "CAUGHT" if caught else "SURVIVED"
+    return (
+        "CAUGHT" if status == "FAIL" else "ERROR" if status == "ERROR" else "SURVIVED"
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -343,8 +359,8 @@ def main(argv: list[str]) -> int:
     # The unmutated selection must pass first, or results would be meaningless.
     baseline_failed = []
     for control in selected:
-        failed_unmutated, _output = _run_test(control.test, control.chain)
-        if failed_unmutated:
+        status, _output = _run_test(control.test, control.chain)
+        if status != "PASS":
             baseline_failed.append(control.test)
     if baseline_failed:
         print("Baseline tests must pass before running controls:", file=sys.stderr)

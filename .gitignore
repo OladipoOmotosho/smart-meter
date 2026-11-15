@@ -95,3 +95,6 @@ docs/BUILD_GUIDE.md
 docs/**/*.pdf
 docs/**/*.csv
 .test-results/
+
+# Curated bounded experiment evidence (never full source CSVs or databases).
+!docs/evidence/**/*.csv

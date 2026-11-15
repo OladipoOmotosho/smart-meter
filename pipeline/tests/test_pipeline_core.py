@@ -75,7 +75,7 @@ def test_new_commit_and_identical_resume_use_one_anchor(local, monkeypatch):
     assert (second.attempted, second.newly_confirmed, second.reconciled) == (1, 0, 1)
     assert db.get_reading(conn, READING.meter_id, READING.interval_start) == READING
     assert db.all_keys(conn) == [(READING.meter_id, READING.interval_start)]
-    assert len((temp / "results.csv").read_text().splitlines()) == 2
+    assert len((temp / "results.csv").read_text().splitlines()) == 3
 
 
 def test_local_conflict_stops_before_chain_write(local, monkeypatch):
@@ -136,7 +136,7 @@ def test_status_zero_never_confirms(local, monkeypatch):
     (attempt,) = db.attempts(local[0], "default", key)
     assert (attempt.tx_hash, attempt.receipt_status) == (TX_HASH, 0)
     assert local[1].entries == {}
-    assert not (local[2] / "results.csv").exists()
+    assert "REVERTED" in (local[2] / "results.csv").read_text()
 
 
 def test_uncertain_submission_never_confirms(local, monkeypatch):
@@ -146,7 +146,7 @@ def test_uncertain_submission_never_confirms(local, monkeypatch):
     key = record_key(READING.meter_id, READING.interval_start)
     assert db.get_submission(local[0], "default", key).state.value == "UNCERTAIN"
     assert local[1].entries == {}
-    assert not (local[2] / "results.csv").exists()
+    assert "UNCERTAIN" in (local[2] / "results.csv").read_text()
 
 
 def test_mismatching_confirmation_never_confirms(local, monkeypatch):
@@ -253,4 +253,89 @@ def test_closed_database_is_error(local):
     assert (
         verify(local[0], local[1], READING.meter_id, READING.interval_start).outcome
         == Verdict.ERROR
+    )
+
+
+@pytest.mark.parametrize(
+    "state,status,want",
+    [
+        (chain.TxState.REVERTED, 0, "FAILED"),
+        (chain.TxState.UNCERTAIN, None, "UNCERTAIN"),
+    ],
+)
+def test_failed_outcome_persists_before_export_error(
+    local, monkeypatch, state, status, want
+):
+    from smart_meter import results
+    from smart_meter.aggregator import ResultsWriteError
+
+    _fake_chain(monkeypatch, local[1], lambda *_: _tx(state, status))
+
+    def fail(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(results, "log", fail)
+    with pytest.raises(ResultsWriteError):
+        _ingest(local)
+    key = record_key(READING.meter_id, READING.interval_start)
+    assert db.get_submission(local[0], "default", key).state.value == want
+
+
+@pytest.mark.parametrize("stage", ["preflight", "broadcast", "resume"])
+def test_rejection_and_resume_are_exported(local, monkeypatch, stage):
+    import csv
+
+    if stage == "resume":
+        _send_success(monkeypatch, local[1])
+        _ingest(local)
+        _ingest(local)
+        wanted = "reconcile"
+    else:
+
+        def reject(*args, **kwargs):
+            if stage == "preflight":
+                raise chain.PreflightError("revert", "role revoked", SENDER)
+            raise chain.BroadcastRejected(args[1], "rejected")
+
+        _send_success(monkeypatch, local[1])
+        monkeypatch.setattr(
+            chain, "prepare_tx" if stage == "preflight" else "broadcast", reject
+        )
+        assert _ingest(local).failed == 1
+        wanted = "submission"
+    with (local[2] / "results.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[-1]["event"] == wanted
+    if stage != "resume":
+        assert rows[-1]["verdict"] == "REJECTED"
+        assert rows[-1]["gas_used"] == "" and rows[-1]["seconds"] == ""
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        chain.TxState.REVERTED,
+        chain.TxState.REPLACED,
+        chain.TxState.SUCCEEDED,
+        chain.TxState.UNCERTAIN,
+    ],
+)
+def test_reconciliation_exports_the_observed_outcome(local, monkeypatch, state):
+    import csv
+
+    _fake_chain(monkeypatch, local[1], lambda *_: _tx(chain.TxState.UNCERTAIN))
+    _ingest(local)
+    monkeypatch.setattr(
+        chain,
+        "lookup",
+        lambda *a: _tx(state, 0 if state is chain.TxState.REVERTED else None),
+    )
+    _ingest(local)
+    with (local[2] / "results.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 2
+    assert rows[-1]["verdict"] == (
+        state.value
+        if state in {chain.TxState.REVERTED, chain.TxState.REPLACED}
+        else "UNCERTAIN"
     )
