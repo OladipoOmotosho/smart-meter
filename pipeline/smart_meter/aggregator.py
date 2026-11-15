@@ -114,9 +114,16 @@ class _Run:
     def _log(self, sub: db.Submission, event: str, **fields) -> None:
         try:
             results.log(
-                self.results_path, event, sub.meter_id, sub.interval_start, **fields
+                self.results_path,
+                event,
+                sub.meter_id,
+                sub.interval_start,
+                run_id=self.run_id,
+                record_key=sub.record_key.hex(),
+                stage=event,
+                **fields,
             )
-        except OSError as error:
+        except (OSError, ValueError) as error:
             raise ResultsWriteError(
                 f"{event} for {sub.record_key.hex()} is recorded in the journal "
                 f"but the results log failed: {error}"
@@ -163,13 +170,26 @@ class _Run:
                 gas_used=result.gas_used,
                 seconds=result.seconds,
                 note=result.tx_hash,
+                tx_hash=result.tx_hash,
+                status=result.status,
             )
             return True
-        if result.state is chain.TxState.UNCERTAIN:
-            self._outcome(sub, SubmissionState.UNCERTAIN, **evidence)
+        uncertain = result.state is chain.TxState.UNCERTAIN
+        state = SubmissionState.UNCERTAIN if uncertain else SubmissionState.FAILED
+        self._outcome(sub, state, **evidence)
+        self._log(
+            sub,
+            "submission",
+            verdict=result.state.value,
+            note=result.reason,
+            tx_hash=result.tx_hash,
+            status=result.status,
+            gas_used=result.gas_used,
+            seconds=result.seconds,
+        )
+        if uncertain:
             self.counts.uncertain += 1
             return False
-        self._outcome(sub, SubmissionState.FAILED, **evidence)  # REVERTED, REPLACED
         self.counts.failed += 1
         return True
 
@@ -183,6 +203,13 @@ class _Run:
                 tx_hash=prepared.tx_hash,
                 outcome="REJECTED",
                 reason=error.reason,
+            )
+            self._log(
+                sub,
+                "submission",
+                verdict="REJECTED",
+                note=error.reason,
+                tx_hash=prepared.tx_hash,
             )
             self.counts.failed += 1
             return True
@@ -214,6 +241,15 @@ class _Run:
                 self._conflict(sub, "conflicting registry digest")
             if looked.state in {chain.TxState.REVERTED, chain.TxState.REPLACED}:
                 self._outcome(sub, SubmissionState.FAILED, **self._evidence(looked))
+                self._log(
+                    sub,
+                    "submission",
+                    verdict=looked.state.value,
+                    note=looked.reason,
+                    tx_hash=looked.tx_hash,
+                    status=looked.status,
+                    gas_used=looked.gas_used,
+                )
                 self.counts.failed += 1
                 continue
             if looked.state is chain.TxState.SUCCEEDED:
@@ -223,6 +259,13 @@ class _Run:
                     "has no commitment; check the deployment context"
                 )
                 self._outcome(sub, SubmissionState.UNCERTAIN, reason=reason)
+                self._log(
+                    sub,
+                    "submission",
+                    verdict="UNCERTAIN",
+                    note=reason,
+                    tx_hash=last.tx_hash,
+                )
                 self.counts.uncertain += 1
                 clear = False
                 continue
@@ -246,6 +289,13 @@ class _Run:
                 continue
             # The lookup itself failed or the result is otherwise unknown.
             self._outcome(sub, SubmissionState.UNCERTAIN, reason=looked.reason)
+            self._log(
+                sub,
+                "submission",
+                verdict="UNCERTAIN",
+                note=looked.reason,
+                tx_hash=last.tx_hash,
+            )
             self.counts.uncertain += 1
             clear = False
         return clear
@@ -274,6 +324,7 @@ class _Run:
                 raise db.ConflictError(
                     f"journal says confirmed but registry differs for {key.hex()}"
                 )
+            self._log(sub, "reconcile", note="previously confirmed commitment verified")
             self.counts.reconciled += 1
             return True
         if sub.state is SubmissionState.FAILED and not retry_failed:
@@ -294,6 +345,7 @@ class _Run:
                 raise  # nothing sent; operational, not a per-record failure
             if sub.state is SubmissionState.PREPARED:
                 self._outcome(sub, SubmissionState.FAILED, reason=str(error))
+            self._log(sub, "submission", verdict="REJECTED", note=str(error))
             self.counts.failed += 1
             return True
         db.record_attempt(

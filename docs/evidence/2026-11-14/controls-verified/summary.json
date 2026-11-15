@@ -1,0 +1,27 @@
+[
+  {
+    "control": "omit value",
+    "test": "tests/test_fingerprint_contract.py::test_literal_versioned_bytes_and_hashes",
+    "caught": true
+  },
+  {
+    "control": "bypass writer role",
+    "test": "test_RevertWhen_UnauthorizedCommit",
+    "caught": true
+  },
+  {
+    "control": "permit overwrite",
+    "test": "test_RevertWhen_KeyAlreadyCommitted",
+    "caught": true
+  },
+  {
+    "control": "accept status zero",
+    "test": "tests/test_transactions.py::test_mined_status_zero_is_reverted_with_evidence",
+    "caught": true
+  },
+  {
+    "control": "audit surviving rows only",
+    "test": "tests/test_audit_run.py::test_manifest_outcomes_and_read_only[delete-MISSING_RECORD]",
+    "caught": true
+  }
+]

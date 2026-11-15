@@ -13,10 +13,10 @@ class ReadCall:
     def __init__(self, registry, key):
         self.registry, self.key = registry, key
 
-    def call(self):
+    def call(self, **kwargs):
         if self.registry.error:
             raise OSError("RPC unavailable")
-        return (self.registry.entries.get(self.key, bytes(32)), 1, "writer")
+        return (self.registry.entries.get(self.key, bytes(32)), 1, "0x" + "11" * 20)
 
 
 class Functions:

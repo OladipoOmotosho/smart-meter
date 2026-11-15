@@ -1,0 +1,4 @@
+
+# Preserve raw CSV line endings and captured test-output whitespace as evidence.
+docs/evidence/**/*.csv whitespace=cr-at-eol
+docs/evidence/**/*.txt -whitespace

@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "adapter": "AMPds2 Electricity_WHE.csv",
+    "boundaries": "incomplete leading/trailing hours excluded and counted",
+    "energy": "sum of 60 one-minute P_W samples / 60, exact rational",
+    "imputation": "'+'-prefixed timestamps retained and counted",
+    "interval_minutes": 60,
+    "power_column": "P",
+    "power_unit": "W",
+    "rounding": "half-up once per interval to integer Wh",
+    "timestamp_column": "unix_ts",
+    "unit": "Wh"
+  },
+  "deployment": {
+    "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "aggregator": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "chain_id": 31337,
+    "deployment_block_hash": "0x334ad563fc720af6d1422c86d7a0738f828fcbf6c34c9b5ce8d9bf5dc8ef3770",
+    "deployment_block_number": 1,
+    "deployment_tx_hash": "0xc59992e388eabaef48fa4c6edb1b7d49e34dc1f6a91d4048da7c2cad9b1598a9",
+    "format": "smart-meter/deployment/v1",
+    "registry_address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "runtime_code_hash": "0x896c92d1166baaaf154869e4fbb4e3f34f3ecefa63d3bfdf4cf3e18eea2d0f82",
+    "versions": {
+      "compiler": "0.8.24+commit.e11b9ed9",
+      "contract": "MeterCommitmentRegistry",
+      "key_format": "smart-meter/key/v1",
+      "node_client": "anvil/v1.9.0",
+      "reading_format": "smart-meter/reading/v1"
+    }
+  },
+  "environment": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "python": "3.12.14",
+    "web3": "7.16.0"
+  },
+  "expected_records": {
+    "count": 24,
+    "file": "expected_records.json",
+    "sha256": "66c29de9a58bf1d37f03c08023ccfc47f75bb39150d0268fc691163481e19d95"
+  },
+  "format": "smart-meter/manifest/v1",
+  "formats": {
+    "key": "smart-meter/key/v1",
+    "reading": "smart-meter/reading/v1"
+  },
+  "run_id": "2026-11-14-run-2",
+  "selection": {
+    "emitted_intervals": 24,
+    "excluded_boundary_hours": 0,
+    "excluded_boundary_rows": 0,
+    "imputed_samples": 0,
+    "limit": 24,
+    "meter_id": "AMPDS2-WHE",
+    "selected_end": "2012-04-02T07:00:00Z",
+    "selected_start": "2012-04-01T07:00:00Z",
+    "source_rows": 1440
+  },
+  "source": {
+    "bytes": 76575286,
+    "path": "/Users/oladipo/myJourney/smart-meter/data/raw/Electricity_WHE.csv",
+    "sha256": "b33fb7f1e3acf21d8dfe8876102965ec8872a5ce9142a8a400ed29f012a19964"
+  }
+}

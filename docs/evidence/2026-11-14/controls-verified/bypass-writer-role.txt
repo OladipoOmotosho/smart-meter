@@ -1,0 +1,18 @@
+Compiling 2 files with Solc 0.8.24
+Solc 0.8.24 finished in 419.24ms
+Compiler run successful!
+
+Ran 1 test for test/MeterCommitmentRegistry.t.sol:MeterCommitmentRegistryTest
+[FAIL: next call did not revert as expected] test_RevertWhen_UnauthorizedCommit() (gas: 88247)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 724.08µs (270.54µs CPU time)
+
+Ran 1 test suite in 4.06ms (724.08µs CPU time): 0 tests passed, 1 failed, 0 skipped (1 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/MeterCommitmentRegistry.t.sol:MeterCommitmentRegistryTest
+[FAIL: next call did not revert as expected] test_RevertWhen_UnauthorizedCommit() (gas: 88247)
+
+Encountered a total of 1 failing tests, 0 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger
