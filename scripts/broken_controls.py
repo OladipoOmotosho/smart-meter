@@ -254,6 +254,57 @@ CONTROLS = (
         ),
         "tests/test_fixtures.py::test_runner_passes_no_rpc_url_or_keys",
     ),
+    # Task 11: presentation dashboard
+    Control(
+        "dashboard accepts a non-loopback host",
+        "pipeline/smart_meter/dashboard.py",
+        (
+            (
+                "    if not is_loopback(host):\n        raise ValueError",
+                "    if False:\n        raise ValueError",
+            ),
+        ),
+        "tests/test_dashboard.py::test_other_hosts_are_refused",
+    ),
+    Control(
+        "evidence set path escapes docs/evidence",
+        "pipeline/smart_meter/dashboard.py",
+        (
+            (
+                "    if not isinstance(name, str) or not SET_NAME.fullmatch(name):",
+                "    if False:",
+            ),
+        ),
+        "tests/test_dashboard.py::test_bad_or_escaping_sets_are_explicit_errors",
+    ),
+    Control(
+        "two live runs at once",
+        "pipeline/smart_meter/dashboard.py",
+        (
+            (
+                '            if self.state == "running":\n                raise RuntimeError',
+                "            if False:\n                raise RuntimeError",
+            ),
+        ),
+        "tests/test_dashboard.py::test_one_live_run_at_a_time_and_rows_are_read_from_its_csv",
+    ),
+    Control(
+        "blank pass value shown as PASS",
+        "pipeline/smart_meter/dashboard.py",
+        (('{"True": True, "False": False}.get(passed)', 'passed != "False"'),),
+        "tests/test_dashboard.py::test_unknown_pass_value_is_not_reported_as_pass",
+    ),
+    Control(
+        "live run startable without JSON",
+        "pipeline/smart_meter/dashboard.py",
+        (
+            (
+                '            if self.headers.get("Content-Type", "").split(";")[0] != "application/json":',
+                "            if False:",
+            ),
+        ),
+        "tests/test_dashboard.py::test_run_requires_json_and_same_origin",
+    ),
     # Controls that need the owned Anvil (--chain)
     Control(
         "chain ID not checked",

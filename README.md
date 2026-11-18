@@ -108,6 +108,28 @@ Writes accept only loopback Anvil and use the public development mnemonic's thro
 
 Exit codes: **0** completed cleanly, **2** completed audit with findings, **1** operational failure or incomplete work. Scenarios return 0 only when every expected result matches, including the expected A4 limitation and S8 error.
 
+## Presentation dashboard
+
+```bash
+make build        # once, so the live run can deploy the contract
+make dashboard    # http://127.0.0.1:8765 (or: make dashboard PORT=9000)
+```
+
+The dashboard shows the curated evidence in `docs/evidence/` as one page: each
+security scenario with its expected and actual outcome, detection, false-alarm
+and rejection rates as numerator/denominator, the three real-data runs, timing
+and gas charts, and provenance. Every number is read from the evidence files;
+nothing is retyped or recomputed. A4 is labelled as the pre-commit limitation,
+and timings are labelled as local Anvil measurements.
+
+**Run all scenarios on a fresh chain** runs the same tested scenario suite live
+on a disposable local chain the dashboard starts and stops, writing only to a new
+`results/dashboard-<time>/` directory. It never edits the curated evidence.
+
+The dashboard listens on loopback only, needs no internet connection and no
+keys, and uses only the Python standard library. Use the **Light / dark** button
+to match the projector.
+
 ## Evaluation and evidence
 
 ```bash

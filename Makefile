@@ -5,10 +5,10 @@ FORGE ?= forge
 ANVIL ?= anvil
 REPORT_DIR ?= .test-results
 
-.PHONY: help install lint build test-unit test-contracts test-integration coverage check chain deploy demo
+.PHONY: help install lint build test-unit test-contracts test-integration coverage check chain deploy demo dashboard
 
 help:
-	@echo 'install lint build test-unit test-contracts test-integration coverage check chain deploy demo'
+	@echo 'install lint build test-unit test-contracts test-integration coverage check chain deploy demo dashboard'
 
 install:
 	@$(PYTHON) -c 'import sys; assert sys.version_info[:2] == (3, 12), "Python 3.12 required"'
@@ -63,3 +63,6 @@ deploy:
 
 demo:
 	@cd pipeline && $(PY) -m smart_meter.demo demo
+
+dashboard:
+	@cd pipeline && $(PY) -m smart_meter.dashboard $(if $(PORT),--port $(PORT),)
