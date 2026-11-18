@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart-Meter Integrity Evidence</title>
+<style>
+:root {
+  --bg: #f6f7f5; --panel: #ffffff; --ink: #14201c; --muted: #5b6b66; --line: #dde3e0;
+  --accent: #1f6f73; --ok: #237a4b; --ok-bg: #e3f3e9; --bad: #b3402a; --bad-bg: #fbe6e1;
+  --warn: #946200; --warn-bg: #fdf1d6; --info: #2c5d8f; --info-bg: #e3edf8;
+  --bar1: #1f6f73; --bar2: #9cc7c9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101615; --panel: #18201f; --ink: #e6ecea; --muted: #9aaaa5; --line: #2a3533;
+    --accent: #5fb3b6; --ok: #6fcf97; --ok-bg: #173225; --bad: #f08a76; --bad-bg: #3a1f19;
+    --warn: #f0c063; --warn-bg: #352a12; --info: #8db8e6; --info-bg: #182a3d;
+    --bar1: #5fb3b6; --bar2: #2f5f61;
+  }
+}
+:root[data-theme="dark"] {
+    --bg: #101615; --panel: #18201f; --ink: #e6ecea; --muted: #9aaaa5; --line: #2a3533;
+    --accent: #5fb3b6; --ok: #6fcf97; --ok-bg: #173225; --bad: #f08a76; --bad-bg: #3a1f19;
+    --warn: #f0c063; --warn-bg: #352a12; --info: #8db8e6; --info-bg: #182a3d;
+    --bar1: #5fb3b6; --bar2: #2f5f61;
+  }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 24px;
+  display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+header h1 { font-size: 1.25rem; margin: 0; }
+header .sub { color: var(--muted); font-size: .9rem; }
+main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 18px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+h2 { font-size: 1.05rem; margin: 0 0 4px; }
+.lead { color: var(--muted); margin: 0 0 14px; font-size: .92rem; }
+select, button { font: inherit; }
+select { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer; }
+button.primary[disabled] { opacity: .55; cursor: progress; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.card .k { color: var(--muted); font-size: .82rem; }
+.card .v { font-size: 1.7rem; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.card .d { color: var(--muted); font-size: .8rem; }
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+td.num { font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .78rem; font-weight: 700; letter-spacing: .02em; }
+.p-ok { background: var(--ok-bg); color: var(--ok); }
+.p-bad { background: var(--bad-bg); color: var(--bad); }
+.p-warn { background: var(--warn-bg); color: var(--warn); }
+.p-info { background: var(--info-bg); color: var(--info); }
+.tag { margin-left: 6px; }
+.p-caught { background: var(--info-bg); color: var(--info); }
+button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.hdr-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.note { color: var(--muted); font-size: .82rem; max-width: 380px; overflow-wrap: anywhere; }
+.banner { border-radius: 8px; padding: 10px 14px; font-size: .92rem; }
+.banner.err { background: var(--bad-bg); color: var(--bad); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.chart h3 { font-size: .92rem; margin: 0 0 6px; }
+.chart .cap { color: var(--muted); font-size: .78rem; margin-top: 4px; }
+.chart svg text { fill: var(--ink); font-size: 15px; }
+.chart svg .muted { fill: var(--muted); }
+.legend { display: flex; gap: 14px; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.live-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+.live-state { color: var(--muted); font-size: .92rem; }
+.live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+.lcell { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.lcell .id { font-weight: 700; }
+.lcell .desc { color: var(--muted); font-size: .8rem; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: .9rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; }
+@keyframes s { to { transform: rotate(360deg); } }
+@media (max-width: 640px) { header { padding: 12px 16px; } section { padding: 14px; } .note { max-width: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Smart-Meter Integrity: Evidence Dashboard</h1>
+    <div class="sub">Blockchain-anchored fingerprints for stored meter readings. Every number below is read from recorded evidence.</div>
+  </div>
+  <div class="hdr-right">
+    <label class="sub">Evidence set
+      <select id="set" aria-label="Evidence set"></select>
+    </label>
+    <button class="ghost" id="theme" type="button">Light / dark</button>
+  </div>
+</header>
+<main>
+  <div id="problems"></div>
+
+  <section aria-labelledby="h-summary">
+    <h2 id="h-summary">What the evidence shows</h2>
+    <p class="lead">Rates show numerator / denominator. A4 is the expected pre-commit limitation and is not counted as detection.</p>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section aria-labelledby="h-scen">
+    <h2 id="h-scen">Security scenarios</h2>
+    <p class="lead">Each scenario runs on its own fresh registry. "Expected" is fixed in advance; the run passes only if the actual outcome matches and the original commitment is unchanged.</p>
+    <div style="overflow-x:auto"><table id="scen"></table></div>
+  </section>
+
+  <section aria-labelledby="h-live">
+    <h2 id="h-live">Live demonstration</h2>
+    <p class="lead">Runs the same tested scenario suite now, on a disposable local chain started for this run. Results appear as each scenario finishes.</p>
+    <div class="live-head">
+      <button class="primary" id="run">Run all scenarios on a fresh chain</button>
+      <span class="live-state" id="live-state">Not started.</span>
+    </div>
+    <div id="live-error"></div>
+    <div class="live-grid" id="live-grid"></div>
+  </section>
+
+  <section aria-labelledby="h-real">
+    <h2 id="h-real">Real AMPds2 data: three independent runs</h2>
+    <p class="lead" id="selection"></p>
+    <div style="overflow-x:auto"><table id="runs"></table></div>
+  </section>
+
+  <section aria-labelledby="h-perf">
+    <h2 id="h-perf">Timing and gas</h2>
+    <p class="lead">Local serial Anvil measurements, median and nearest-rank p95. Not public-network throughput, finality or cost.</p>
+    <div class="grid2">
+      <div class="chart" id="c-commit"></div>
+      <div class="chart" id="c-audit"></div>
+      <div class="chart" id="c-gas"></div>
+      <div class="chart" id="c-proj"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-prov">
+    <h2 id="h-prov">Provenance and limits</h2>
+    <dl class="kv" id="prov"></dl>
+    <p class="lead" id="limits" style="margin-top:14px"></p>
+  </section>
+</main>
+<script>
+"use strict";
+const DESC = {
+  S0: "Clean control: unchanged records",
+  A1: "Stored value changed after commit",
+  A2: "Unauthorized account submits",
+  A3: "Authorized overwrite attempt",
+  A4: "Value altered before commit",
+  S5: "Committed row deleted",
+  S6: "Record stored, never committed",
+  S6b: "Neither record nor commitment",
+  S7: "Revoked writer submits",
+  S8: "Stored row corrupted",
+  S9: "Transaction mined but reverted",
+  S10: "Finished run resumed",
+};
+const GOOD = new Set(["VERIFIED", "RECONCILED"]);
+const DETECT = new Set(["TAMPERED", "MISSING_RECORD", "MISSING_COMMITMENT", "MISSING_BOTH", "REJECTED", "REVERTED"]);
+
+function el(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+function pill(text, kind) { return el("span", { class: "pill p-" + kind, text }); }
+function outcomePill(o) {
+  if (!o) return pill("N/A", "info");
+  if (GOOD.has(o)) return pill(o, "ok");
+  if (o === "ERROR") return pill(o, "warn");
+  if (DETECT.has(o)) return pill(o, "caught");
+  return pill(o, "info");
+}
+function na(v, f = (x) => x) { return v === null || v === undefined || v === "" ? "N/A" : f(v); }
+function ms(s) { return na(s, (x) => (Number(x) * 1000).toFixed(2) + " ms"); }
+function rate(r) {
+  if (!r) return { v: "N/A", d: "not recorded" };
+  return { v: `${r.numerator}/${r.denominator}`, d: r.rate === null ? "no eligible cases: N/A" : `${(r.rate * 100).toFixed(0)}%` };
+}
+async function getJSON(url, opts) {
+  const res = await fetch(url, opts);
+  const body = await res.json().catch(() => ({ error: "invalid response" }));
+  if (!res.ok) throw new Error(body.error || res.statusText);
+  return body;
+}
+function showProblems(list) {
+  const box = document.getElementById("problems");
+  box.replaceChildren(...list.map((p) => el("div", { class: "banner err", role: "alert", text: p })));
+}
+
+function renderCards(ev) {
+  const p = ev.pooled, runs = ev.runs || [];
+  const committed = runs.reduce((a, r) => a + (r.ingestion?.newly_confirmed ?? 0), 0);
+  const resumeNew = runs.reduce((a, r) => a + (r.resume?.newly_confirmed ?? 0), 0);
+  const a4 = p.precommit_limit_cases;
+  const items = [
+    ["Post-commit tampering detected", rate(p.detection)],
+    ["Clean-control false alarms", rate(p.false_alarms)],
+    ["Unauthorized / overwrite rejected", rate(p.rejections)],
+    ["Real readings committed", { v: String(committed), d: `${runs.length} runs, then audited` }],
+    ["New transactions on resume", { v: String(resumeNew), d: "resume reconciles; never re-sends" }],
+    ["Pre-commit limitation (A4)", { v: na(a4, String), d: "expected VERIFIED; outside detection" }],
+  ];
+  document.getElementById("cards").replaceChildren(...items.map(([k, x]) =>
+    el("div", { class: "card" }, el("div", { class: "k", text: k }), el("div", { class: "v", text: x.v }), el("div", { class: "d", text: x.d }))));
+}
+
+function scenarioRow(s) {
+  const verdict = s.passed === true ? pill("PASS", "ok") : s.passed === false ? pill("FAIL", "bad") : pill("N/A", "info");
+  const idCell = el("td", {}, el("strong", { text: s.scenario }));
+  if (s.scenario === "A4") idCell.append(el("span", { class: "tag" }, pill("LIMITATION", "warn")));
+  return el("tr", {}, idCell, el("td", { text: DESC[s.scenario] || "" }),
+    el("td", {}, outcomePill(s.expected)), el("td", {}, outcomePill(s.actual)), el("td", {}, verdict),
+    el("td", { class: "note", text: s.reason || s.note || "", title: s.note || "" }));
+}
+function renderScenarios(ev) {
+  const t = document.getElementById("scen");
+  const head = el("tr", {}, ...["Scenario", "What happens", "Expected", "Actual", "Result", "Recorded reason"].map((h) => el("th", { text: h })));
+  if (!ev.scenarios) { t.replaceChildren(el("thead", {}, head), el("tbody", {}, el("tr", {}, el("td", { colspan: "6", text: "Scenario evidence unavailable (see the error above)." })))); return; }
+  t.replaceChildren(el("thead", {}, head), el("tbody", {}, ...ev.scenarios.map(scenarioRow)));
+}
+
+function renderRuns(ev) {
+  const prov = ev.provenance || {};
+  document.getElementById("selection").textContent = na(prov.selection, (s) => "Selection: " + s + ".");
+  const head = el("tr", {}, ...["Run", "Committed", "Audit", "Resume reconciled", "New tx on resume", "Commit median / p95", "Audit median / p95"].map((h) => el("th", { text: h })));
+  const rows = (ev.runs || []).map((r) => {
+    const m = r.metrics || {};
+    const verified = m.outcomes ? (m.outcomes.VERIFIED ?? 0) : null;
+    const audited = m.audit_seconds ? m.audit_seconds.n : null;
+    return el("tr", {}, el("td", { text: "Run " + r.run }),
+      el("td", { class: "num", text: `${na(r.ingestion?.newly_confirmed)} / ${na(r.ingestion?.attempted)}` }),
+      el("td", {}, audited === null ? pill("N/A", "info") : pill(`${verified}/${audited} VERIFIED`, verified === audited ? "ok" : "bad")),
+      el("td", { class: "num", text: na(r.resume?.reconciled) }),
+      el("td", { class: "num", text: na(r.resume?.newly_confirmed) }),
+      el("td", { class: "num", text: `${ms(m.commit_seconds?.median)} / ${ms(m.commit_seconds?.p95)}` }),
+      el("td", { class: "num", text: `${ms(m.audit_seconds?.median)} / ${ms(m.audit_seconds?.p95)}` }));
+  });
+  document.getElementById("runs").replaceChildren(el("thead", {}, head), el("tbody", {}, ...rows));
+}
+
+const SVGNS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs, text) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  return e;
+}
+function barChart(id, title, groups, fmt, caption) {
+  const box = document.getElementById(id);
+  const vals = groups.flatMap((g) => [g.median, g.p95]).filter((v) => v !== null && v !== undefined);
+  const max = vals.length ? Math.max(...vals) : 0;
+  const W = 420, rowH = 52, left = 70, right = 92, H = groups.length * rowH + 10;
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": title });
+  groups.forEach((g, i) => {
+    const y = 6 + i * rowH;
+    s.append(svg("text", { x: 0, y: y + 26 }, g.label));
+    [["median", "var(--bar1)", 0], ["p95", "var(--bar2)", 22]].forEach(([k, c, dy]) => {
+      const v = g[k];
+      const w = v === null || v === undefined || max === 0 ? 0 : (v / max) * (W - left - right);
+      s.append(svg("rect", { x: left, y: y + dy, width: Math.max(w, v ? 1 : 0), height: 18, rx: 3, fill: c }));
+      s.append(svg("text", { x: left + w + 6, y: y + dy + 14, class: "muted" }, v === null || v === undefined ? "N/A" : fmt(v)));
+    });
+  });
+  const legend = el("div", { class: "legend" },
+    el("span", {}, el("span", { class: "sw", style: "background:var(--bar1)" }), "median"),
+    el("span", {}, el("span", { class: "sw", style: "background:var(--bar2)" }), "p95 (nearest rank)"));
+  box.replaceChildren(el("h3", { text: title }), legend, s, el("div", { class: "cap", text: caption }));
+}
+function renderCharts(ev) {
+  const runs = ev.runs || [], p = ev.pooled || {};
+  const grp = (key) => [...runs.map((r) => ({ label: "Run " + r.run, median: r.metrics?.[key]?.median ?? null, p95: r.metrics?.[key]?.p95 ?? null, n: r.metrics?.[key]?.n })),
+    { label: "Pooled", median: p[key]?.median ?? null, p95: p[key]?.p95 ?? null, n: p[key]?.n }];
+  const ns = (key) => "n per group: " + grp(key).map((g) => `${g.label} ${na(g.n)}`).join(", ");
+  barChart("c-commit", "Commit: send to successful receipt", grp("commit_seconds"), (v) => (v * 1000).toFixed(2) + " ms", ns("commit_seconds") + ". Excludes parsing, signing and resume.");
+  barChart("c-audit", "Audit: per-record read, hash and registry lookup", grp("audit_seconds"), (v) => (v * 1000).toFixed(2) + " ms", ns("audit_seconds") + ".");
+  barChart("c-gas", "Gas per successful commitment", grp("commit_gas"), (v) => Math.round(v).toLocaleString(), ns("commit_gas") + ". From real receipts.");
+  const pr = ev.projection;
+  const box = document.getElementById("c-proj");
+  if (!pr) { box.replaceChildren(el("h3", { text: "Scale projection" }), el("p", { class: "cap", text: "No projection recorded (N/A)." })); return; }
+  box.replaceChildren(el("h3", { text: "Scale projection (hypothetical)" }),
+    el("dl", { class: "kv" },
+      el("dt", { text: "Assumption" }), el("dd", { text: `${pr.meters} meters, ${pr.interval_minutes}-minute intervals, one transaction per record` }),
+      el("dt", { text: "Transactions/day" }), el("dd", { text: na(pr.transactions_per_day, (v) => Number(v).toLocaleString()) }),
+      el("dt", { text: "Gas/day" }), el("dd", { text: na(pr.gas_per_day, (v) => Number(v).toLocaleString()) })),
+    el("div", { class: "cap", text: pr.label }));
+}
+
+function renderProvenance(ev) {
+  const p = ev.provenance || {};
+  const before = p.source_checksums_before || {}, after = p.source_checksums_after || {};
+  const same = Object.keys(before).length > 0 && JSON.stringify(before) === JSON.stringify(after);
+  const kv = [
+    ["Evidence set", ev.set + (ev.superseded ? " (superseded)" : "")],
+    ["Code revision", na(p.code_revision, (r) => r.slice(0, 12) + (p.dirty ? " (with local changes)" : " (clean)"))],
+    ["Tools", [p.foundry, p.anvil].filter(Boolean).join("; ") || "N/A"],
+    ["Command", na(p.command)],
+    ["Source checksums", Object.keys(before).length ? (same ? "unchanged before and after the runs" : "CHANGED or incomplete") : "N/A"],
+    ...Object.entries(before).map(([k, v]) => [k, v]),
+  ];
+  document.getElementById("prov").replaceChildren(...kv.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", {}, k.endsWith(".csv") ? el("code", { text: v }) : v)]));
+  document.getElementById("limits").textContent = na(ev.limitations, (l) => "Limitations: " + l);
+}
+
+async function loadEvidence(name) {
+  try {
+    const ev = await getJSON("/api/evidence?set=" + encodeURIComponent(name));
+    const problems = [...ev.problems];
+    if (ev.superseded) problems.unshift("This evidence set is marked SUPERSEDED. Do not cite it.");
+    showProblems(problems);
+    renderCards(ev); renderScenarios(ev); renderRuns(ev); renderCharts(ev); renderProvenance(ev);
+  } catch (e) { showProblems(["Evidence could not be loaded: " + e.message]); }
+}
+
+// --- live run ---
+let polling = null;
+function renderLive(st) {
+  const btn = document.getElementById("run");
+  const running = st.state === "running";
+  btn.disabled = running;
+  const done = st.rows.length, total = Object.keys(st.expected).length;
+  const label = {
+    idle: "Not started.",
+    running: `Running: ${done} of ${total} scenarios finished (${na(st.elapsed)} s).`,
+    passed: `Finished: all ${total} scenarios matched their expected outcomes in ${na(st.elapsed)} s.`,
+    mismatch: `Finished with mismatches after ${na(st.elapsed)} s.`,
+    failed: "The run stopped with an error.",
+  }[st.state] || st.state;
+  document.getElementById("live-state").replaceChildren(running ? el("span", { class: "spin", "aria-hidden": "true" }) : "", " ", label,
+    st.directory ? el("span", { class: "note", text: "  Output: " + st.directory }) : "");
+  const errs = [st.error, ...st.problems].filter(Boolean);
+  document.getElementById("live-error").replaceChildren(...errs.map((e) => el("div", { class: "banner err", role: "alert", style: "margin-bottom:10px", text: e })));
+  const byId = Object.fromEntries(st.rows.map((r) => [r.scenario, r]));
+  document.getElementById("live-grid").replaceChildren(...Object.entries(st.expected).map(([id, exp]) => {
+    const r = byId[id];
+    const right = r ? el("span", {}, outcomePill(r.actual), " ", r.passed ? pill("PASS", "ok") : pill("FAIL", "bad"))
+      : (running ? el("span", { class: "spin", "aria-label": "pending" }) : pill("expected " + exp, "info"));
+    return el("div", { class: "lcell" }, el("div", {}, el("div", { class: "id", text: id }), el("div", { class: "desc", text: DESC[id] || "" })), right);
+  }));
+  if (!running && polling) { clearInterval(polling); polling = null; }
+}
+async function pollLive() {
+  try { renderLive(await getJSON("/api/live-run")); }
+  catch (e) { document.getElementById("live-error").replaceChildren(el("div", { class: "banner err", text: "Live status unavailable: " + e.message })); }
+}
+document.getElementById("run").addEventListener("click", async () => {
+  try {
+    renderLive(await getJSON("/api/live-run", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }));
+    if (!polling) polling = setInterval(pollLive, 700);
+  } catch (e) { document.getElementById("live-error").replaceChildren(el("div", { class: "banner err", text: e.message })); }
+});
+
+(() => {
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("theme"); if (t) root.dataset.theme = t; } catch (_) {}
+  document.getElementById("theme").addEventListener("click", () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("theme", root.dataset.theme); } catch (_) {}
+  });
+})();
+
+(async () => {
+  try {
+    const { sets, default: def } = await getJSON("/api/sets");
+    const sel = document.getElementById("set");
+    sel.replaceChildren(...sets.map((s) => el("option", { value: s.name, text: s.name + (s.superseded ? " (superseded)" : "") })));
+    if (!sets.length) { showProblems(["No evidence sets found under docs/evidence/."]); }
+    else { sel.value = def || sets[0].name; sel.addEventListener("change", () => loadEvidence(sel.value)); await loadEvidence(sel.value); }
+  } catch (e) { showProblems(["Dashboard API unavailable: " + e.message]); }
+  const st = await getJSON("/api/live-run").catch(() => null);
+  if (st) { renderLive(st); if (st.state === "running") polling = setInterval(pollLive, 700); }
+})();
+</script>
+</body>
+</html>
