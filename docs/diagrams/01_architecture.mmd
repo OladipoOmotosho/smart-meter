@@ -6,7 +6,7 @@
 
 flowchart TB
 
-    subgraph AMI["Real-world AMI context (not built). Smart meter is modelled by the meter simulator; MDMS by the SQLite database"]
+    subgraph AMI["Real-world AMI context (not built). Smart meter is modelled by the AMPds2 WHE loader; MDMS by the SQLite database"]
         direction LR
         RM["Smart meter"] --> DCN["Data concentrator"] --> HES["Head-end system"] --> MDMS["Utility MDMS"]
     end
@@ -20,9 +20,9 @@ flowchart TB
 
     subgraph TRUST["2. Trusted aggregator (assumed trusted until the commitment is recorded)"]
         direction TB
-        SER["Canonical serializer<br/>fixed field order and encoding:<br/>meter_id, interval_start, value, unit, seq"]
-        RKEY["Record key<br/>SHA-256 of meter_id + interval_start"]
-        HASH["Fingerprint<br/>SHA-256 of canonical bytes"]
+        SER["Canonical serializer<br/>versioned UTF-8 JSON arrays,<br/>fixed field order, integers only"]
+        RKEY["Record key (identity)<br/>SHA-256 of JSON array<br/>[#quot;smart-meter/key/v1#quot;, meter_id, interval_start]"]
+        HASH["Digest (content)<br/>SHA-256 of JSON array<br/>[#quot;smart-meter/reading/v1#quot;, meter_id,<br/>interval_start, value_wh, unit, seq]"]
         BATCH["Batch builder (extension)<br/>one digest per interval"]
         W3A["web3.py client<br/>validates deployment context, signs,<br/>journals tx identity before broadcast,<br/>reconciles uncertain outcomes"]
         MAN[("Run manifest + expected_records.json<br/>source checksum, conversion policy,<br/>deployment context, expected keys")]

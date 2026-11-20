@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>One Meter Reading, End to End — 3D Telemetry Stage</title>
+  <style>
+    * { box-sizing: border-box; }
+    canvas#scene3d { cursor: grab; touch-action: none; display: block; }
+    canvas#scene3d:active { cursor: grabbing; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .diff-char { background: color-mix(in srgb, var(--error) 22%, transparent); color: var(--error); border-radius: 2px; padding: 0 0.5px; font-weight: 700; }
+    .bar-col { transition: height 0.45s ease, background-color 0.35s ease; }
+    :root[data-theme="light"] { --card:#ffffff; --background:#eef3f2; --foreground:#13211f; --muted-foreground:#4c5f5c; --primary:#17807a; --primary-foreground:#ffffff; --success:#1d8a50; --warning:#9a6400; --error:#c23a27; --border:#c3d2cf; --card-border:#c3d2cf; --accent:#dcefeb }
+    :root:not([data-theme="light"]) { --card:#142328; --background:#0d181c; --foreground:#eef6f4; --muted-foreground:#b7c9c8; --primary:#6cd5c8; --primary-foreground:#102627; --success:#68cd94; --warning:#f2bc68; --error:#ff8978; --border:#395052; --card-border:#395052; --accent:#284649 }
+    #viewport {position:relative;height:clamp(420px,57svh,700px);overflow:hidden}
+    #scene3d {width:100%;height:100%}
+    .camera-tools {display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+    .camera-tools button {min-height:42px;padding:5px 12px;border:1px solid var(--border);border-radius:8px}
+    .camera-tools button[aria-pressed=true] {background:var(--primary);color:var(--primary-foreground)}
+    #cam-in,#cam-out {min-width:44px;font-size:20px}
+    /* Plain CSS (no network needed) so buttons stay readable in both themes. */
+    .scen-chip, #theme-toggle, .camera-tools button { transition:none !important; }
+    .scen-chip[aria-pressed="false"], #theme-toggle { background:var(--card) !important; color:var(--foreground) !important; border:1px solid var(--card-border) !important; }
+    .scen-chip[aria-pressed="true"] { background:var(--primary) !important; color:var(--primary-foreground) !important; border:1px solid transparent !important; }
+    .camera-tools button { color:var(--foreground); background:var(--card); }
+    .camera-tools button[aria-pressed=true] { background:var(--primary) !important; color:var(--primary-foreground) !important; }
+    section:first-of-type > div:first-child > div:first-child {flex-wrap:wrap}
+    @media(max-width:650px){#viewport{height:clamp(420px,59svh,600px)} .gesture-help{flex-basis:100%}}
+  </style>
+  <!-- Utility styles generated once from Tailwind and embedded, so the page needs no network. -->
+  <style id="utilities">
+*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0, 0, 0, 0);white-space:nowrap;border-width:0}.pointer-events-none{pointer-events:none}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.left-3{left:0.75rem}.right-3{right:0.75rem}.top-3{top:0.75rem}.m-0{margin:0px}.mx-1\.5{margin-left:0.375rem;margin-right:0.375rem}.mx-auto{margin-left:auto;margin-right:auto}.ml-1\.5{margin-left:0.375rem}.mt-0\.5{margin-top:0.125rem}.ml-1{margin-left:0.25rem}.ml-2{margin-left:0.5rem}.ml-auto{margin-left:auto}.block{display:block}.inline-block{display:inline-block}.flex{display:flex}.inline-flex{display:inline-flex}.grid{display:grid}.hidden{display:none}.h-2{height:0.5rem}.h-full{height:100%}.h-24{height:6rem}.w-2{width:0.5rem}.w-full{width:100%}.w-24{width:6rem}.w-4{width:1rem}.min-w-\[140px\]{min-width:140px}.min-w-\[82px\]{min-width:82px}.max-w-4xl{max-width:56rem}.max-w-7xl{max-width:80rem}.flex-1{flex:1 1 0%}.grid-cols-\[max-content_1fr\]{grid-template-columns:max-content 1fr}.grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.flex-wrap{flex-wrap:wrap}.items-end{align-items:flex-end}.items-center{align-items:center}.items-baseline{align-items:baseline}.justify-between{justify-content:space-between}.gap-1\.5{gap:0.375rem}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-2\.5{gap:0.625rem}.gap-\[2px\]{gap:2px}.gap-x-4{column-gap:1rem}.gap-y-1\.5{row-gap:0.375rem}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.space-y-1 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.25rem * var(--tw-space-y-reverse))}.space-y-1\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.375rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.375rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.break-all{word-break:break-all}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-md{border-radius:0.375rem}.rounded-xl{border-radius:0.75rem}.rounded{border-radius:0.25rem}.rounded-t-sm{border-top-left-radius:0.125rem;border-top-right-radius:0.125rem}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-t{border-top-width:1px}.border-l-4{border-left-width:4px}.border-\[var\(--border\)\]{border-color:var(--border)}.border-\[var\(--card-border\)\]{border-color:var(--card-border)}.border-transparent{border-color:transparent}.border-\[var\(--primary\)\]{border-color:var(--primary)}.border-\[var\(--warning\)\]{border-color:var(--warning)}.bg-\[var\(--background\)\]{background-color:var(--background)}.bg-\[var\(--card\)\]{background-color:var(--card)}.bg-\[var\(--primary\)\]{background-color:var(--primary)}.bg-\[var\(--success\)\]{background-color:var(--success)}.bg-\[var\(--warning\)\]{background-color:var(--warning)}.bg-\[var\(--accent\)\]{background-color:var(--accent)}.bg-\[var\(--error\)\]{background-color:var(--error)}.p-0{padding:0px}.p-4{padding:1rem}.p-3{padding:0.75rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-2\.5{padding-left:0.625rem;padding-right:0.625rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.px-3\.5{padding-left:0.875rem;padding-right:0.875rem}.px-4{padding-left:1rem;padding-right:1rem}.py-0\.5{padding-top:0.125rem;padding-bottom:0.125rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.py-4{padding-top:1rem;padding-bottom:1rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.pb-2{padding-bottom:0.5rem}.pb-3{padding-bottom:0.75rem}.pt-1{padding-top:0.25rem}.pt-2{padding-top:0.5rem}.text-right{text-align:right}.align-middle{vertical-align:middle}.font-mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}.text-base{font-size:1rem;line-height:1.5rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xs{font-size:0.75rem;line-height:1rem}.text-\[11px\]{font-size:11px}.text-xl{font-size:1.25rem;line-height:1.75rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.font-extrabold{font-weight:800}.italic{font-style:italic}.tabular-nums{--tw-numeric-spacing:tabular-nums;font-variant-numeric:var(--tw-ordinal) var(--tw-slashed-zero) var(--tw-numeric-figure) var(--tw-numeric-spacing) var(--tw-numeric-fraction)}.leading-relaxed{line-height:1.625}.tracking-tight{letter-spacing:-0.025em}.tracking-wide{letter-spacing:0.025em}.text-\[var\(--foreground\)\]{color:var(--foreground)}.text-\[var\(--muted-foreground\)\]{color:var(--muted-foreground)}.text-\[var\(--primary\)\]{color:var(--primary)}.text-\[var\(--primary-foreground\)\]{color:var(--primary-foreground)}.text-\[var\(--error\)\]{color:var(--error)}.text-\[var\(--success\)\]{color:var(--success)}.text-\[var\(--warning\)\]{color:var(--warning)}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.accent-\[var\(--primary\)\]{accent-color:var(--primary)}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.hover\:bg-\[var\(--accent\)\]:hover{background-color:var(--accent)}.hover\:text-\[var\(--foreground\)\]:hover{color:var(--foreground)}@media (min-width: 768px){.md\:grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}}
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased m-0 p-0">
+  <div class="max-w-7xl mx-auto px-4 py-4 space-y-3">
+
+    <!-- Header -->
+    <header class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-[var(--foreground)]">
+          One Meter Reading, End to End <span class="text-xs font-semibold px-2 py-0.5 ml-1.5 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] align-middle">3D Stage</span>
+        </h1>
+        <p class="text-xs text-[var(--muted-foreground)] mt-0.5">
+          Why is an edit <b class="text-[var(--foreground)]">after</b> commit caught, but an edit <b class="text-[var(--foreground)]">before</b> commit is not?
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Scenario">
+        <button class="scen-chip px-3 py-1 rounded-full text-xs font-semibold border transition-colors" data-s="clean" aria-pressed="true">Clean (S0)</button>
+        <button class="scen-chip px-3 py-1 rounded-full text-xs font-semibold border transition-colors" data-s="a1" aria-pressed="false">A1 · Edit After</button>
+        <button class="scen-chip px-3 py-1 rounded-full text-xs font-semibold border transition-colors" data-s="s5" aria-pressed="false">S5 · Delete After</button>
+        <button class="scen-chip px-3 py-1 rounded-full text-xs font-semibold border transition-colors" data-s="a4" aria-pressed="false">A4 · Alter Before</button>
+        <button id="theme-toggle" type="button" class="px-3 py-1 rounded-full text-xs font-semibold border border-[var(--border)] text-[var(--foreground)]" aria-label="Switch light or dark theme">Light / Dark</button>
+      </div>
+    </header>
+
+    <!-- 3D Viewport Card -->
+    <section class="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden relative">
+      <!-- Floating Top Overlay -->
+      <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-[var(--card-border)] text-xs">
+        <div class="flex items-center gap-3 text-[var(--muted-foreground)]">
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[var(--primary)]"></span>Trusted Prep</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[var(--warning)]"></span>Mutable MDMS</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[var(--success)]"></span>Immutable Anchor</span>
+          <span class="gesture-help">Drag to orbit · In plan, drag to pan · Two fingers to pan and pinch</span>
+        </div>
+        <div class="camera-tools">
+          <button id="cam-auto" class="px-2.5 py-1 rounded-md border text-xs font-medium transition-colors" title="Auto-frame active step">Auto-Follow</button>
+          <button id="cam-iso" class="px-2.5 py-1 rounded-md border border-[var(--card-border)] text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Overview</button>
+          <button id="cam-top" class="px-2.5 py-1 rounded-md border border-[var(--card-border)] text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Plan view</button>
+          <button id="cam-out" aria-label="Zoom out">−</button><button id="cam-in" aria-label="Zoom in">+</button>
+        </div>
+      </div>
+
+      <!-- 3D Canvas -->
+      <div class="relative w-full" id="viewport">
+        <canvas id="scene3d" class="w-full h-full"></canvas>
+        <!-- Step Badge Overlay -->
+        <div id="hud-step" class="pointer-events-none absolute top-3 left-3 px-3 py-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--card)]/90 backdrop-blur-sm text-xs">
+          <span id="hud-pos" class="font-semibold text-[var(--primary)]"></span>
+          <span class="mx-1.5 text-[var(--muted-foreground)]">·</span>
+          <span id="hud-route" class="text-[var(--foreground)] font-medium"></span>
+        </div>
+        <!-- Live Verdict Watermark on Step 11 -->
+        <div id="hud-verdict" class="pointer-events-none hidden absolute top-3 right-3 px-3 py-1 rounded-lg font-bold text-xs tracking-wide border"></div>
+      </div>
+
+      <!-- Playback Bar -->
+      <div class="flex flex-wrap items-center gap-2 px-3 py-2 border-t border-[var(--card-border)] bg-[var(--card)]">
+        <button id="restart" class="px-2.5 py-1 rounded-lg border border-[var(--card-border)] text-xs font-medium hover:bg-[var(--accent)]" title="Restart (R)">⟲ Restart</button>
+        <button id="back" class="px-2.5 py-1 rounded-lg border border-[var(--card-border)] text-xs font-medium hover:bg-[var(--accent)]" title="Back (←)">◀ Back</button>
+        <button id="play" class="px-3.5 py-1 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold" title="Play / Pause (Space)">▶ Play</button>
+        <button id="next" class="px-2.5 py-1 rounded-lg border border-[var(--card-border)] text-xs font-medium hover:bg-[var(--accent)]" title="Next (→)">Next ▶</button>
+        <input id="scrub" type="range" min="0" max="11" value="0" aria-label="Step" class="flex-1 min-w-[140px] accent-[var(--primary)]" />
+        <span id="pos" class="text-xs font-mono text-[var(--muted-foreground)] tabular-nums min-w-[82px] text-right"></span>
+      </div>
+    </section>
+
+    <!-- Narrative + Cryptographic Inspector Stage -->
+    <section id="stage" class="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 space-y-3">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="title" class="text-base font-bold text-[var(--foreground)]"></h2>
+        <span id="step-tag" class="text-xs px-2.5 py-0.5 rounded-full border border-[var(--card-border)] text-[var(--muted-foreground)]"></span>
+      </div>
+      <p id="explain" class="text-sm text-[var(--foreground)] leading-relaxed max-w-4xl"></p>
+      <div id="detail" class="space-y-3"></div>
+    </section>
+
+    <div id="live" class="sr-only" aria-live="polite"></div>
+    <footer id="foot" class="text-xs text-[var(--muted-foreground)] leading-relaxed pb-2"></footer>
+  </div>
+
+<script>
+"use strict";
+
+// ============================================================================
+// 1. REAL AMPds2 DATA & SELF-TESTED FIPS 180-4 SHA-256 (IDENTICAL TO SOURCE)
+// ============================================================================
+const SAMPLES = [918,913,872,872,772,881,1005,1124,1096,1046,1051,1055,1051,2467,2796,2874,2910,2924,2787,2696,2677,2705,2705,2595,2600,2595,2609,2595,2613,2618,2613,2600,2609,2618,2618,2623,2741,913,886,900,909,900,913,996,1160,1147,1119,1270,1028,1032,1019,1023,621,626,621,525,511,520,516,516];
+const METER = "AMPDS2-WHE", START = "2012-04-01T07:00:00Z";
+const KNOWN = {
+  key:  "8a4843e418fcc7e9a89bfa298bcaefadac18201e3c0857edee689ff980c1a7ad",
+  1609: "d7542ea5a49cc908527a003f46c621e7e216f29fb507c20d559090d6f361a67a",
+  1610: "404d9049e9a78bb4e02d981304bbb233bcb0ea918018aa40da3429a345b0d634",
+  999:  "1ee4b984583f49d5b57e90e1e7a0a1a7047188f30ccf2ae0301e64754a14abe1",
+};
+const REAL_TX = { hash: "0x0c6fcb63a0d5ac427279e6eb5d00a904356848712f19aceb0a65c428fb6f2db9", gas: 72565, ms: 1.691 };
+const A4_WATTS = 999;
+
+function sha256hex(str) {
+  const bytes = new TextEncoder().encode(str);
+  const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const l = bytes.length, n = (((l + 9) + 63) >> 6) << 6, m = new Uint8Array(n);
+  m.set(bytes); m[l] = 0x80;
+  const dv = new DataView(m.buffer); dv.setUint32(n - 4, l * 8); dv.setUint32(n - 8, Math.floor(l / 0x20000000));
+  const w = new Uint32Array(64), r = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let o = 0; o < n; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = r(w[i-15],7) ^ r(w[i-15],18) ^ (w[i-15] >>> 3), s1 = r(w[i-2],17) ^ r(w[i-2],19) ^ (w[i-2] >>> 10);
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+    }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (r(e,6) ^ r(e,11) ^ r(e,25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+      const t2 = ((r(a,2) ^ r(a,13) ^ r(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0]+=a; H[1]+=b; H[2]+=c; H[3]+=d; H[4]+=e; H[5]+=f; H[6]+=g; H[7]+=h;
+  }
+  return Array.from(H, (x) => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+
+const keyBytes = () => JSON.stringify(["smart-meter/key/v1", METER, START]);
+const readingBytes = (wh) => JSON.stringify(["smart-meter/reading/v1", METER, START, wh, "Wh", 0]);
+const SELF_TEST = [[keyBytes(), KNOWN.key], ...[1609, 1610, 999].map((v) => [readingBytes(v), KNOWN[v]])]
+  .every(([b, h]) => sha256hex(b) === h);
+
+function integrate(samples) {
+  const sum = samples.reduce((a, b) => a + b, 0);
+  const q = Math.floor(sum / 60), rem = sum % 60;
+  return { sum, q, rem, wh: rem * 2 >= 60 ? q + 1 : q };
+}
+
+// ============================================================================
+// 2. MODEL FRAMES (EXACT 12 FRAMES + 4 SCENARIOS)
+// ============================================================================
+function buildFrames(s) {
+  const loaded = s === "a4" ? SAMPLES.map(() => A4_WATTS) : SAMPLES.slice();
+  const I = integrate(loaded);
+  const committedWh = I.wh;
+  const keyHash = sha256hex(keyBytes());
+  const commitDigest = sha256hex(readingBytes(committedWh));
+  const stored = s === "s5" ? null : (s === "a1" ? committedWh + 1 : committedWh);
+  const storedDigest = stored === null ? null : sha256hex(readingBytes(stored));
+  const verdict = stored === null ? "MISSING_RECORD" : (storedDigest === commitDigest ? "VERIFIED" : "TAMPERED");
+  const realCommit = s !== "a4";
+  const ctx = { s, loaded, I, committedWh, keyHash, commitDigest, stored, storedDigest, verdict, realCommit };
+  const F = [
+    { id: "intro", title: "The question", tag: "Overview", nodes: [], cam: { tx: 0, ty: 28, tz: 0, yaw: -0.32, pitch: 0.48, dist: 920 },
+      explain: "We follow one real reading from the AMPds2 whole-house meter: 07:00 to 08:00 UTC on 1 April 2012. Step through the 3D pipeline, drag to orbit, then switch scenarios to watch which stage flips the outcome." },
+    { id: "samples", title: "1 · Raw minute samples", tag: "Trusted Zone · Edge", nodes: ["src"], cam: { tx: -340, ty: 44, tz: 20, yaw: -0.55, pitch: 0.44, dist: 560 },
+      explain: s === "a4"
+        ? "Scenario A4: someone alters the source before the pipeline sees it. Every one-minute power value is replaced with 999 W (the method scenario A4 uses). The audit has no independent measurement to compare with this input."
+        : "The meter records real power P in watts once a minute. This hour has exactly 60 samples (shown as the 3D skyline rising above the meter) and none are imputed." },
+    { id: "integrate", title: "2 · Integrate to one hourly reading", tag: "dataset.py", nodes: ["src", "load"], cam: { tx: -275, ty: 38, tz: 20, yaw: -0.40, pitch: 0.46, dist: 620 },
+      explain: "Energy for the hour is the sum of the 60 one-minute watt values divided by 60, computed exactly and rounded once, half up. The result is an integer on purpose: a fingerprint needs exactly one way to write the number." },
+    { id: "key", title: "3 · Record key: which reading is this?", tag: "fingerprint.py", nodes: ["load", "fp"], cam: { tx: -165, ty: 42, tz: 15, yaw: -0.28, pitch: 0.45, dist: 600 },
+      explain: "The identity hash covers only the meter and the hour, inside a versioned JSON array. It does not include the value, so editing the value later keeps the exact same record_key." },
+    { id: "digest", title: "4 · Digest: what does the reading contain?", tag: "fingerprint.py", nodes: ["load", "fp"], cam: { tx: -155, ty: 48, tz: 15, yaw: 0.22, pitch: 0.44, dist: 580 },
+      explain: "The content hash covers all five fields. Change any single character or watt-hour and this SHA-256 digest changes completely." },
+    { id: "manifest", title: "5 · Write the run manifest (once)", tag: "runs.py · Independent", nodes: ["fp", "man"], cam: { tx: -55, ty: 56, tz: -65, yaw: -0.35, pitch: 0.46, dist: 610 },
+      explain: "Before anything is sent, the expected key and digest go into expected_records.json on its elevated write-once pedestal. The auditor loops over this list, never over the mutable database." },
+    { id: "prepared", title: "6 · Journal: PREPARED", tag: "db.py · SQLite v1", nodes: ["fp", "db"], cam: { tx: 20, ty: 36, tz: 55, yaw: -0.25, pitch: 0.48, dist: 640 },
+      explain: "The reading and the intent to commit are saved to SQLite in one transaction. A database and a blockchain cannot share one atomic transaction, so the journal records where each reading is." },
+    { id: "submitted", title: "7 · Journal: SUBMITTED (before sending)", tag: "aggregator.py · Crash-Safe", nodes: ["db", "chain"], cam: { tx: 165, ty: 42, tz: 0, yaw: -0.32, pitch: 0.47, dist: 650 },
+      explain: "The signed transaction's hash and nonce are saved before broadcast. After a crash, resume checks what happened to that transaction and rebroadcasts the identical signed bytes if needed." },
+    { id: "commit", title: "8 · Registry commit → CONFIRMED", tag: "MeterCommitmentRegistry.sol", nodes: ["chain"], cam: { tx: 235, ty: 48, tz: -55, yaw: -0.45, pitch: 0.43, dist: 570 },
+      explain: "The smart contract checks three laser guards in order: AGGREGATOR_ROLE, non-zero digest, and unused recordKey. Only if all pass does it lock the digest append-once." },
+    { id: "after", title: "9 · Later, inside the utility database", tag: s === "a1" || s === "s5" ? "Post-Commit Attack!" : "Post-Commit State", nodes: ["db"], hit: s === "a1" || s === "s5", cam: { tx: 115, ty: 38, tz: 70, yaw: 0.35, pitch: 0.42, dist: 540 },
+      explain: {
+        clean: "Nothing happens to the stored row in SQLite.",
+        a1: "An insider with database access edits the stored value from " + committedWh + " to " + (committedWh + 1) + " Wh. The registry crystal stays untouched because the contract rejects a second commitment for that key.",
+        s5: "An insider deletes the SQLite row completely (the data platter vanishes), hoping the reading disappears from any audit.",
+        a4: "Nothing happens to the stored row. The damage in A4 happened before step 1, so the SQLite cylinder and the registry crystal still agree.",
+      }[s] },
+    { id: "audit", title: "10 · Audit: read both sides", tag: "verifier.py · Read-Only", nodes: ["man", "db", "chain", "aud"], predict: true, cam: { tx: 190, ty: 44, tz: 0, yaw: -0.28, pitch: 0.50, dist: 760 },
+      explain: "The auditor needs no signing key and sends no transactions. It fires three read beams: expected key from the Manifest, row from a read-only SQLite snapshot, and digest from the Registry at one fixed block. Predict the verdict before revealing it." },
+    { id: "verdict", title: "11 · Verdict", tag: "Final Outcome", nodes: ["aud"], cam: { tx: 345, ty: 52, tz: 10, yaw: 0.36, pitch: 0.40, dist: 540 },
+      explain: {
+        VERIFIED: s === "a4"
+          ? "VERIFIED. The altered input produced 999 Wh. That value went into both SQLite and the commitment, so their fingerprints agree. A hardware signature at the meter would expose post-signing tampering."
+          : "VERIFIED: the recomputed digest from SQLite matches the append-once registry digest.",
+        TAMPERED: "TAMPERED: same record_key, completely different SHA-256 digest. The insider altered SQLite but could not rewrite the registry.",
+        MISSING_RECORD: "MISSING_RECORD: the manifest still expects this key and the registry still holds it, but the SQLite row is gone. Deletion cannot hide a reading.",
+      }[verdict] },
+  ];
+  return { frames: F, ctx };
+}
+
+// ============================================================================
+// 3. 3D ENGINE (PURE CANVAS PERSPECTIVE, Z-SORTED, LAMBERT SHADING, ORBIT)
+// ============================================================================
+const NODE_DEF = [
+  { id: "src",   x: -355, y: 0, z:  28, label: "Source CSV",   sub: "AMPds2 60×1m", step: 1, zone: "trust" },
+  { id: "load",  x: -235, y: 0, z:  28, label: "Loader",       sub: "dataset.py",   step: 2, zone: "trust" },
+  { id: "fp",    x: -115, y: 0, z:  28, label: "Fingerprint",  sub: "SHA-256",      step: 3, zone: "trust" },
+  { id: "man",   x:   -5, y: 20, z: -98, label: "Manifest",    sub: "Write-Once",   step: 5, zone: "trust" },
+  { id: "db",    x:  110, y: 0, z:  72, label: "SQLite MDMS",  sub: "Mutable + Log",step: 6, zone: "untrust" },
+  { id: "chain", x:  235, y: 0, z: -68, label: "Registry",     sub: "Append-Once",  step: 8, zone: "anchor" },
+  { id: "aud",   x:  355, y: 0, z:  12, label: "Auditor",      sub: "Read-Only",    step: 10, zone: "anchor" },
+];
+const EDGES_3D = [
+  ["src", "load"], ["load", "fp"], ["fp", "man"], ["fp", "db"],
+  ["db", "chain"], ["man", "aud"], ["db", "aud"], ["chain", "aud"]
+];
+
+let state = { s: "clean", i: 0, playing: false, prediction: null, tryValue: null };
+let model = buildFrames("clean");
+let timer = null;
+
+// Camera state with smooth interpolation
+const cam = {
+  tx: 0, ty: 28, tz: 0, yaw: -0.32, pitch: 0.48, dist: 920,
+  goalTx: 0, goalTy: 28, goalTz: 0, goalYaw: -0.32, goalPitch: 0.48, goalDist: 920,
+  plan: false, auto: true, dragging: false, lastX: 0, lastY: 0, moved: false
+};
+
+// Live theme colors resolved from CSS semantic variables
+let PAL = {};
+function parseColorToRGB(cssColor, fallback) {
+  const tmp = document.createElement("canvas");
+  tmp.width = tmp.height = 1;
+  const c = tmp.getContext("2d");
+  c.fillStyle = fallback;
+  c.fillStyle = cssColor || fallback;
+  c.fillRect(0, 0, 1, 1);
+  const d = c.getImageData(0, 0, 1, 1).data;
+  return [d[0], d[1], d[2]];
+}
+function shadeRGB(rgb, factor, alpha = 1) {
+  const r = Math.max(0, Math.min(255, Math.round(rgb[0] * factor)));
+  const g = Math.max(0, Math.min(255, Math.round(rgb[1] * factor)));
+  const b = Math.max(0, Math.min(255, Math.round(rgb[2] * factor)));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function syncTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const get = (v, fb) => (cs.getPropertyValue(v) || "").trim() || fb;
+  const bgRgb = parseColorToRGB(get("--card", "#12181c"), "#12181c");
+  const isLight = (bgRgb[0] * 0.299 + bgRgb[1] * 0.587 + bgRgb[2] * 0.114) > 140;
+  PAL = {
+    isLight,
+    bg: get("--card", "#12181c"),
+    bgRgb,
+    fg: get("--foreground", isLight ? "#14201c" : "#e6efec"),
+    muted: get("--muted-foreground", isLight ? "#5a6a65" : "#8ea29d"),
+    border: get("--border", isLight ? "#d0dad7" : "#2b3835"),
+    primary: parseColorToRGB(get("--primary", "#209499"), "#209499"),
+    success: parseColorToRGB(get("--success", "#2ea365"), "#2ea365"),
+    warning: parseColorToRGB(get("--warning", "#d99b1e"), "#d99b1e"),
+    error:   parseColorToRGB(get("--error",   "#d95340"), "#d95340"),
+    slate:   isLight ? [185, 198, 204] : [58, 76, 84],
+    floorT:  isLight ? [216, 238, 235] : [22, 48, 52],
+    floorV:  isLight ? [228, 234, 240] : [24, 34, 46],
+    accentHex: get("--primary", "#209499"),
+    okHex:     get("--success", "#2ea365"),
+    warnHex:   get("--warning", "#d99b1e"),
+    errHex:    get("--error",   "#d95340"),
+  };
+}
+
+const canvas = document.getElementById("scene3d");
+const ctx2d = canvas.getContext("2d");
+let W = 900, H = 390, DPR = 1;
+let hitTargets = [];
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(300, rect.width);
+  H = Math.max(260, rect.height);
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  ctx2d.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+// 3D Math helpers
+const LIGHT = (() => {
+  const x = -0.45, y = 0.82, z = -0.35;
+  const m = Math.hypot(x, y, z);
+  return [x / m, y / m, z / m];
+})();
+
+function project(wx, wy, wz) {
+  const dx = wx - cam.tx, dy = wy - cam.ty, dz = wz - cam.tz;
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const rx = dx * cy - dz * sy;
+  const rz = dx * sy + dz * cy;
+  // Camera above the scene looking down: higher points are nearer, far floor rises.
+  const ry = dy * cp + rz * sp;
+  const rz2 = -dy * sp + rz * cp;
+  const camZ = cam.dist + rz2;
+  if (!cam.plan && camZ < 45) return null;
+  const fov = Math.min(W, H) * 1.48;
+  const scale = fov / (cam.plan ? cam.dist : camZ);
+  return { x: W * 0.5 + rx * scale, y: H * 0.52 - ry * scale, z: camZ, s: scale };
+}
+
+function addPoly(list, pts3, rgb, alpha, stroke, lineW = 1) {
+  const proj = pts3.map(p => project(p[0], p[1], p[2]));
+  if (proj.some(p => !p)) return;
+  // Face normal for directional lighting
+  const ax = pts3[1][0] - pts3[0][0], ay = pts3[1][1] - pts3[0][1], az = pts3[1][2] - pts3[0][2];
+  const bx = pts3[2][0] - pts3[0][0], by = pts3[2][1] - pts3[0][1], bz = pts3[2][2] - pts3[0][2];
+  let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+  const nm = Math.hypot(nx, ny, nz) || 1;
+  nx /= nm; ny /= nm; nz /= nm;
+  const ndotl = Math.abs(nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+  const shade = 0.62 + 0.42 * ndotl;
+  const avgZ = proj.reduce((s, p) => s + p.z, 0) / proj.length;
+  list.push({
+    z: avgZ,
+    draw() {
+      ctx2d.beginPath();
+      ctx2d.moveTo(proj[0].x, proj[0].y);
+      for (let i = 1; i < proj.length; i++) ctx2d.lineTo(proj[i].x, proj[i].y);
+      ctx2d.closePath();
+      if (rgb) {
+        ctx2d.fillStyle = shadeRGB(rgb, shade, alpha);
+        ctx2d.fill();
+      }
+      if (stroke) {
+        ctx2d.strokeStyle = stroke;
+        ctx2d.lineWidth = lineW;
+        ctx2d.stroke();
+      }
+    }
+  });
+}
+
+function addBox(list, cx, cy, cz, sx, sy, sz, rgb, alpha = 0.92, stroke = null) {
+  const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+  const v = [
+    [cx-hx, cy-hy, cz-hz], [cx+hx, cy-hy, cz-hz], [cx+hx, cy+hy, cz-hz], [cx-hx, cy+hy, cz-hz],
+    [cx-hx, cy-hy, cz+hz], [cx+hx, cy-hy, cz+hz], [cx+hx, cy+hy, cz+hz], [cx-hx, cy+hy, cz+hz],
+  ];
+  const faces = [
+    [0,1,2,3], [4,5,6,7], [0,1,5,4], [2,3,7,6], [0,3,7,4], [1,2,6,5]
+  ];
+  const st = stroke || shadeRGB(rgb, PAL.isLight ? 0.68 : 1.28, Math.min(1, alpha * 0.85));
+  for (const f of faces) addPoly(list, f.map(i => v[i]), rgb, alpha, st, 0.9);
+}
+
+function addCylinder(list, cx, y0, cz, r, h, segs, rgb, alpha = 0.92, wireframe = false) {
+  const top = [], bot = [];
+  for (let i = 0; i < segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    const px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r;
+    top.push([px, y0 + h, pz]);
+    bot.push([px, y0, pz]);
+  }
+  const st = shadeRGB(rgb, PAL.isLight ? 0.65 : 1.35, wireframe ? 0.85 : 0.65);
+  for (let i = 0; i < segs; i++) {
+    const j = (i + 1) % segs;
+    addPoly(list, [bot[i], bot[j], top[j], top[i]], wireframe ? null : rgb, alpha, st, wireframe ? 1.1 : 0.7);
+  }
+  addPoly(list, top, wireframe ? null : rgb, Math.min(1, alpha + 0.05), st, wireframe ? 1.2 : 0.9);
+}
+
+function addOctahedron(list, cx, cy, cz, r, angle, rgb, alpha = 0.92) {
+  const ring = [];
+  for (let i = 0; i < 4; i++) {
+    const a = angle + i * Math.PI * 0.5;
+    ring.push([cx + Math.cos(a) * r, cy, cz + Math.sin(a) * r]);
+  }
+  const top = [cx, cy + r * 1.35, cz];
+  const bot = [cx, cy - r * 1.35, cz];
+  const st = shadeRGB(rgb, 1.45, 0.9);
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    addPoly(list, [top, ring[i], ring[j]], rgb, alpha, st, 1.1);
+    addPoly(list, [bot, ring[j], ring[i]], rgb, alpha * 0.85, st, 1.1);
+  }
+}
+
+function addLine3D(list, p1, p2, color, width = 2, dash = null) {
+  const a = project(p1[0], p1[1], p1[2]);
+  const b = project(p2[0], p2[1], p2[2]);
+  if (!a || !b) return;
+  list.push({
+    z: (a.z + b.z) * 0.5,
+    draw() {
+      ctx2d.save();
+      ctx2d.beginPath();
+      if (dash) ctx2d.setLineDash(dash);
+      ctx2d.moveTo(a.x, a.y);
+      ctx2d.lineTo(b.x, b.y);
+      ctx2d.strokeStyle = color;
+      ctx2d.lineWidth = width;
+      ctx2d.stroke();
+      ctx2d.restore();
+    }
+  });
+}
+
+function addGlowSphere(list, p, radius, rgb, alpha = 0.95) {
+  const pr = project(p[0], p[1], p[2]);
+  if (!pr) return;
+  const rr = Math.max(2.5, radius * pr.s);
+  list.push({
+    z: pr.z - 4,
+    draw() {
+      const grad = ctx2d.createRadialGradient(pr.x, pr.y, rr * 0.15, pr.x, pr.y, rr * 2.4);
+      grad.addColorStop(0, shadeRGB(rgb, 1.5, alpha));
+      grad.addColorStop(0.45, shadeRGB(rgb, 1.0, alpha * 0.75));
+      grad.addColorStop(1, shadeRGB(rgb, 1.0, 0));
+      ctx2d.fillStyle = grad;
+      ctx2d.beginPath();
+      ctx2d.arc(pr.x, pr.y, rr * 2.4, 0, Math.PI * 2);
+      ctx2d.fill();
+    }
+  });
+}
+
+function quadBezier3(p0, p1, p2, t) {
+  const u = 1 - t;
+  return [
+    u*u*p0[0] + 2*u*t*p1[0] + t*t*p2[0],
+    u*u*p0[1] + 2*u*t*p1[1] + t*t*p2[1],
+    u*u*p0[2] + 2*u*t*p1[2] + t*t*p2[2],
+  ];
+}
+
+function edgeControlPoints(aId, bId) {
+  const A = NODE_DEF.find(n => n.id === aId);
+  const B = NODE_DEF.find(n => n.id === bId);
+  const p0 = [A.x, A.y + 18, A.z];
+  const p2 = [B.x, B.y + 18, B.z];
+  let midY = Math.max(A.y, B.y) + 22;
+  let midZ = (A.z + B.z) * 0.5;
+  if (aId === "man" && bId === "aud") { midY = 74; midZ = -115; }
+  else if (aId === "fp" && bId === "db") { midY = 26; midZ = 95; }
+  else if (aId === "db" && bId === "aud") { midY = 30; midZ = 105; }
+  else if (aId === "chain" && bId === "aud") { midY = 44; midZ = -48; }
+  const p1 = [(A.x + B.x) * 0.5, midY, midZ];
+  return [p0, p1, p2];
+}
+
+// Render loop
+function render3D(nowMs) {
+  const t = nowMs * 0.001;
+  // Smooth camera lerp
+  if (cam.auto && !cam.dragging) {
+    const k = 0.085;
+    cam.tx += (cam.goalTx - cam.tx) * k;
+    cam.ty += (cam.goalTy - cam.ty) * k;
+    cam.tz += (cam.goalTz - cam.tz) * k;
+    cam.yaw += (cam.goalYaw - cam.yaw) * k;
+    cam.pitch += (cam.goalPitch - cam.pitch) * k;
+    cam.dist += (cam.goalDist - cam.dist) * k;
+  }
+
+  // Clear background with subtle depth gradient
+  ctx2d.clearRect(0, 0, W, H);
+  const grad = ctx2d.createRadialGradient(W * 0.5, H * 0.42, 40, W * 0.5, H * 0.5, Math.max(W, H) * 0.72);
+  grad.addColorStop(0, shadeRGB(PAL.bgRgb, PAL.isLight ? 0.99 : 1.25, 1));
+  grad.addColorStop(1, shadeRGB(PAL.bgRgb, PAL.isLight ? 0.92 : 0.72, 1));
+  ctx2d.fillStyle = grad;
+  ctx2d.fillRect(0, 0, W, H);
+
+  const f = model.frames[state.i];
+  const c = model.ctx;
+  const activeSet = new Set(f.nodes);
+  const hasActive = activeSet.size > 0;
+  const afterAttack = state.i >= 9;
+  const isCommitted = state.i >= 8;
+
+  // --- FLOOR PLATFORMS (drawn behind solids) ---
+  const floorList = [];
+  // Trusted Prep Platform (-430 to +45)
+  addPoly(floorList, [[-435,-2,-155],[42,-2,-155],[42,-2,145],[-435,-2,145]], PAL.floorT, 0.85, shadeRGB(PAL.primary, 1, 0.35), 1.3);
+  // Storage & Verification Platform (+52 to +435)
+  addPoly(floorList, [[52,-2,-155],[435,-2,-155],[435,-2,145],[52,-2,145]], PAL.floorV, 0.85, shadeRGB(PAL.success, 1, 0.30), 1.3);
+  // Subtle grid lines
+  const gridCol = shadeRGB(PAL.slate, 1, PAL.isLight ? 0.28 : 0.16);
+  for (let gx = -400; gx <= 400; gx += 60) addLine3D(floorList, [gx, -1, -150], [gx, -1, 140], gridCol, 0.8);
+  for (let gz = -140; gz <= 140; gz += 56) addLine3D(floorList, [-430, -1, gz], [430, -1, gz], gridCol, 0.8);
+  floorList.sort((a, b) => b.z - a.z);
+  floorList.forEach(item => item.draw());
+
+  // --- MAIN 3D SCENE SOLIDS & EFFECTS ---
+  const drawList = [];
+
+  // Glowing Vertical Trust Boundary Glass Wall at x = 47
+  const wallCol = c.s === "a4" && state.i >= 1 ? PAL.warning : PAL.primary;
+  addPoly(drawList, [[47, 0, -150], [47, 74, -150], [47, 74, 140], [47, 0, 140]], wallCol, 0.10, shadeRGB(wallCol, 1.2, 0.55), 1.3);
+  addLine3D(drawList, [47, 74, -150], [47, 74, 140], shadeRGB(wallCol, 1.4, 0.85), 1.8, [5, 4]);
+
+  // Curved 3D Pipeline Connectors & Animated Telemetry Packets
+  for (const [aId, bId] of EDGES_3D) {
+    const on = activeSet.has(aId) && activeSet.has(bId);
+    const [p0, p1, p2] = edgeControlPoints(aId, bId);
+    const isAuditEdge = bId === "aud";
+    const edgeRgb = isAuditEdge ? PAL.success : PAL.primary;
+    const strokeCol = on ? shadeRGB(edgeRgb, 1.25, 0.95) : shadeRGB(PAL.slate, 1, PAL.isLight ? 0.45 : 0.32);
+    const segs = 14;
+    let prev = p0;
+    for (let k = 1; k <= segs; k++) {
+      const pt = quadBezier3(p0, p1, p2, k / segs);
+      addLine3D(drawList, prev, pt, strokeCol, on ? 2.8 : 1.15, on ? null : [4, 4]);
+      prev = pt;
+    }
+    if (on || state.i === 0) {
+      const count = on ? 2 : 1;
+      for (let p = 0; p < count; p++) {
+        const u = ((t * (on ? 0.52 : 0.25) + p / count) % 1);
+        const pos = quadBezier3(p0, p1, p2, u);
+        addGlowSphere(drawList, pos, on ? 6.5 : 3.5, (c.s === "a4" && !isAuditEdge) ? PAL.error : edgeRgb, on ? 0.95 : 0.55);
+      }
+    }
+  }
+
+  // --- BUILD EACH 3D NODE ---
+  hitTargets = [];
+  for (const n of NODE_DEF) {
+    const active = activeSet.has(n.id);
+    const dim = hasActive && !active;
+    const alpha = dim ? 0.38 : 0.94;
+    const baseRgb = n.zone === "untrust" ? PAL.warning : (n.zone === "anchor" ? PAL.success : PAL.primary);
+    const padRgb = active ? baseRgb : PAL.slate;
+
+    // Pedestal base
+    addBox(drawList, n.x, n.y + 4, n.z, 76, 8, 62, padRgb, active ? 0.95 : (dim ? 0.32 : 0.72));
+
+    // 1. SOURCE CSV: 3D 60-Bar Real AMPds2 Energy Skyline!
+    if (n.id === "src") {
+      const maxW = Math.max(...SAMPLES, A4_WATTS);
+      const isA4 = c.s === "a4";
+      const barRgb = isA4 ? PAL.error : PAL.primary;
+      // Render 20 grouped columns (3 minutes each) in a crisp 2-row 3D skyline
+      for (let i = 0; i < 20; i++) {
+        const val = (c.loaded[i*3] + c.loaded[i*3+1] + c.loaded[i*3+2]) / 3;
+        const bh = 6 + (val / maxW) * 52;
+        const bx = n.x - 28 + (i % 10) * 6.2;
+        const bz = n.z + (i < 10 ? -11 : 11);
+        addBox(drawList, bx, n.y + 8 + bh / 2, bz, 4.6, bh, 12, barRgb, alpha);
+      }
+    }
+
+    // 2. LOADER: Funnel + Floating Integrated Wh Cube
+    if (n.id === "load") {
+      addBox(drawList, n.x, n.y + 18, n.z, 46, 18, 38, active ? PAL.primary : PAL.slate, alpha * 0.85);
+      const bob = Math.sin(t * 2.4) * 3.5;
+      const cubeRgb = c.s === "a4" ? PAL.error : PAL.primary;
+      addBox(drawList, n.x, n.y + 44 + bob, n.z, 24, 24, 24, cubeRgb, alpha);
+    }
+
+    // 3. FINGERPRINT ENGINE: Rotating 3D Cryptographic Octahedron
+    if (n.id === "fp") {
+      const bob = Math.sin(t * 2.0 + 1) * 4;
+      const crysRgb = f.id === "key" ? PAL.primary : (c.s === "a4" ? PAL.warning : PAL.primary);
+      addOctahedron(drawList, n.x, n.y + 42 + bob, n.z, 22, t * (active ? 1.4 : 0.45), crysRgb, alpha);
+      if (f.id === "key" || f.id === "digest") {
+        addGlowSphere(drawList, [n.x, n.y + 42 + bob, n.z], 11, crysRgb, 0.75);
+      }
+    }
+
+    // 4. MANIFEST: Elevated Obsidian/Glass Pedestal + Sealed Lock Slab
+    if (n.id === "man") {
+      // Elevation pillar down to floor
+      addBox(drawList, n.x, 10, n.z, 18, 20, 18, PAL.slate, alpha * 0.55);
+      addBox(drawList, n.x, n.y + 24, n.z, 54, 30, 16, active ? PAL.primary : PAL.slate, alpha);
+      // Floating seal ring
+      addBox(drawList, n.x, n.y + 48 + Math.sin(t * 2) * 2, n.z, 26, 8, 8, PAL.success, alpha);
+    }
+
+    // 5. SQLITE MDMS: 3-Ring Stacked Database Cylinder (Reacts to A1 & S5!)
+    if (n.id === "db") {
+      const deleted = afterAttack && c.s === "s5";
+      const tampered = afterAttack && c.s === "a1";
+      const ringCol = tampered ? PAL.error : (deleted ? PAL.error : (state.i >= 6 ? PAL.warning : PAL.slate));
+      // Journal lower rings
+      addCylinder(drawList, n.x, n.y + 8,  n.z, 28, 12, 14, state.i >= 6 ? PAL.warning : PAL.slate, alpha * 0.9, false);
+      addCylinder(drawList, n.x, n.y + 22, n.z, 28, 12, 14, state.i >= 7 ? PAL.primary : PAL.slate, alpha * 0.9, false);
+      // Top data platter: vanishes to wireframe on S5, lifts & glows crimson on A1
+      const lift = tampered ? 6 + Math.sin(t * 6) * 2 : 0;
+      addCylinder(drawList, n.x, n.y + 36 + lift, n.z, 28, 14, 14, ringCol, deleted ? 0.8 : alpha, deleted);
+      if (tampered || deleted) {
+        addGlowSphere(drawList, [n.x, n.y + 52, n.z], 9, PAL.error, 0.75);
+      }
+    }
+
+    // 6. REGISTRY SMART CONTRACT: 3 Laser Guard Gates + Linked Immutable Blocks
+    if (n.id === "chain") {
+      // 3 vertical guard gates along front edge
+      const guardCol = isCommitted ? PAL.success : (active ? PAL.primary : PAL.slate);
+      for (let g = 0; g < 3; g++) {
+        const gx = n.x - 24 + g * 24;
+        addBox(drawList, gx, n.y + 26, n.z + 24, 4, 34, 4, guardCol, alpha);
+      }
+      // 2 chained Ethereum blocks behind the gates
+      addBox(drawList, n.x - 16, n.y + 24, n.z - 8, 24, 24, 24, PAL.slate, alpha * 0.75);
+      addLine3D(drawList, [n.x - 4, n.y + 24, n.z - 8], [n.x + 8, n.y + 24, n.z - 8], shadeRGB(PAL.success, 1.3, alpha), 2.5);
+      const bob = isCommitted ? Math.sin(t * 2.2) * 3 : 0;
+      const blkRgb = isCommitted ? PAL.success : PAL.slate;
+      addBox(drawList, n.x + 18, n.y + 26 + bob, n.z - 8, 28, 28, 28, blkRgb, alpha);
+      if (isCommitted) addGlowSphere(drawList, [n.x + 18, n.y + 26 + bob, n.z - 8], 10, PAL.success, 0.6);
+    }
+
+    // 7. READ-ONLY AUDITOR: Optical Prism + Holographic Verdict Beacon
+    if (n.id === "aud") {
+      addCylinder(drawList, n.x, n.y + 8, n.z, 24, 18, 12, active ? PAL.success : PAL.slate, alpha);
+      const vRgb = c.verdict === "VERIFIED" ? PAL.success : (c.verdict === "TAMPERED" ? PAL.error : PAL.warning);
+      const beaconRgb = state.i >= 11 ? vRgb : (active ? PAL.primary : PAL.slate);
+      addOctahedron(drawList, n.x, n.y + 46 + Math.sin(t * 2.5) * 3, n.z, 17, -t * 1.1, beaconRgb, alpha);
+      if (state.i >= 11) {
+        // Towering verdict beam
+        addCylinder(drawList, n.x, n.y + 26, n.z, 12, 58, 10, vRgb, 0.24, false);
+        addGlowSphere(drawList, [n.x, n.y + 52, n.z], 13, vRgb, 0.85);
+      }
+      // Audit scanning beams on Step 10
+      if (f.id === "audit") {
+        const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+        addLine3D(drawList, [n.x, n.y + 44, n.z], [-5, 52, -98], shadeRGB(PAL.primary, 1.3, 0.5 + 0.4 * pulse), 2.4, [6, 3]);
+        addLine3D(drawList, [n.x, n.y + 44, n.z], [110, 44, 72], shadeRGB(PAL.warning, 1.3, 0.5 + 0.4 * pulse), 2.4, [6, 3]);
+        addLine3D(drawList, [n.x, n.y + 44, n.z], [235, 34, -68], shadeRGB(PAL.success, 1.3, 0.5 + 0.4 * pulse), 2.4, [6, 3]);
+      }
+    }
+
+    // Store hit target for clicking 3D nodes
+    const anchor = project(n.x, n.y + 30, n.z);
+    if (anchor) hitTargets.push({ node: n, x: anchor.x, y: anchor.y, r: Math.max(24, 38 * anchor.s) });
+  }
+
+  // Painter's sort and render all 3D primitives
+  drawList.sort((a, b) => b.z - a.z);
+  for (const item of drawList) item.draw();
+
+  // --- CRISP 2D SCREEN-SPACE LABELS PINNED TO 3D ANCHORS ---
+  ctx2d.textAlign = "center";
+  // Zone floor labels
+  // Pinned to the floor's front edge (nearest the camera), clear of every node.
+  const lz = project(-225, 2, -146);
+  if (lz && W > 720 && !cam.plan) {
+    ctx2d.font = "600 10px system-ui, -apple-system, sans-serif";
+    ctx2d.fillStyle = shadeRGB(PAL.primary, 1.1, 0.85);
+    ctx2d.fillText("INPUT & PREPARATION (TRUSTED ZONE)", lz.x, lz.y);
+  }
+  const rz = project(140, 2, -146);
+  if (rz && W > 720 && !cam.plan) {
+    ctx2d.font = "600 10px system-ui, -apple-system, sans-serif";
+    ctx2d.fillStyle = shadeRGB(PAL.success, 1.1, 0.85);
+    ctx2d.fillText("STORAGE & VERIFICATION", rz.x, rz.y);
+  }
+  const wb = project(47, 82, 0);
+  if (wb && W > 720 && !cam.plan) {
+    ctx2d.font = "700 9.5px system-ui, -apple-system, sans-serif";
+    ctx2d.fillStyle = shadeRGB(wallCol, 1.2, 0.9);
+    ctx2d.fillText("TRUST BOUNDARY", wb.x, wb.y);
+  }
+
+  // Node labels
+  for (const n of NODE_DEF) {
+    const active = activeSet.has(n.id);
+    const dim = hasActive && !active;
+    const pt = project(n.x, n.y - 4, n.z + 44);
+    if (!pt) continue;
+    ctx2d.save();
+    ctx2d.globalAlpha = dim ? 0.78 : 1;
+    ctx2d.font = (active ? "700 16px" : "600 14px") + " system-ui, -apple-system, sans-serif";
+    ctx2d.fillStyle = PAL.fg;
+    ctx2d.lineWidth = 4; ctx2d.strokeStyle = PAL.bg; ctx2d.strokeText(n.label, pt.x, pt.y + 8);
+    ctx2d.fillText(n.label, pt.x, pt.y + 8);
+    ctx2d.font = "500 10px system-ui, -apple-system, sans-serif";
+    ctx2d.fillStyle = PAL.muted;
+    if (W > 640) ctx2d.fillText(n.sub, pt.x, pt.y + 24);
+    ctx2d.restore();
+  }
+
+  requestAnimationFrame(render3D);
+}
+
+// ============================================================================
+// 4. DOM INSPECTOR & INTERACTIVE CONTROLS (100% PARITY WITH SOURCE)
+// ============================================================================
+function h(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") e.className = v;
+    else if (k === "text") e.textContent = v;
+    else e.setAttribute(k, v);
+  }
+  kids.flat().forEach((k) => k != null && e.append(k));
+  return e;
+}
+
+function pill(text, tone) {
+  const styles = {
+    ok:   "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",
+    bad:  "bg-[var(--error)]/15 text-[var(--error)] border-[var(--error)]/30",
+    warn: "bg-[var(--warning)]/20 text-[var(--warning)] border-[var(--warning)]/35",
+    acc:  "bg-[var(--primary)]/15 text-[var(--primary)] border-[var(--primary)]/30",
+    info: "bg-[var(--accent)] text-[var(--foreground)] border-[var(--card-border)]",
+  };
+  return h("span", { class: "inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border " + (styles[tone] || styles.info), text });
+}
+const verdictTone = (v) => v === "VERIFIED" ? "ok" : v === "TAMPERED" ? "bad" : v.startsWith("MISSING") ? "warn" : "info";
+
+function hashWithDiff(hex, against) {
+  const span = h("span", { class: "mono text-xs break-all" });
+  for (let i = 0; i < hex.length; i++) {
+    const ch = document.createElement("span");
+    ch.textContent = hex[i];
+    if (against && against[i] !== hex[i]) ch.className = "diff-char";
+    span.append(ch);
+  }
+  return span;
+}
+
+function codeBox(text) {
+  return h("div", { class: "mono text-xs bg-[var(--background)] border border-[var(--card-border)] rounded-lg px-3 py-2 break-all text-[var(--foreground)]", text });
+}
+
+function detailFor(f, c) {
+  const d = [];
+  if (f.id === "intro") {
+    d.push(h("dl", { class: "grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-xs" },
+      h("dt", { class: "text-[var(--muted-foreground)] font-medium", text: "Meter" }), h("dd", { text: METER + " (AMPds2 whole-house)" }),
+      h("dt", { class: "text-[var(--muted-foreground)] font-medium", text: "Hour" }), h("dd", { text: START + " to 08:00:00Z" }),
+      h("dt", { class: "text-[var(--muted-foreground)] font-medium", text: "Controls" }), h("dd", { text: "Drag to orbit, hold Shift and drag to pan, or pinch with two fingers to zoom. Tap a pedestal to jump, or press → / Space / 1–4." })));
+  }
+  if (f.id === "samples" || f.id === "integrate") {
+    const max = Math.max(...SAMPLES, A4_WATTS);
+    const barWrap = h("div", { class: "flex items-end gap-[2px] h-24 px-1 pt-2 border-b border-[var(--card-border)]", "aria-hidden": "true" },
+      c.loaded.map((v) => {
+        const b = h("div", { class: "bar-col flex-1 rounded-t-sm " + (c.s === "a4" ? "bg-[var(--error)]" : "bg-[var(--primary)]") });
+        b.style.height = Math.max(3, (v / max) * 100) + "%";
+        b.title = v + " W";
+        return b;
+      }));
+    d.push(barWrap);
+    d.push(h("p", { class: "text-xs text-[var(--muted-foreground)]", text: `60 one-minute samples (W): min ${Math.min(...c.loaded)}, max ${Math.max(...c.loaded)}, sum ${c.I.sum.toLocaleString()}.` + (c.s === "a4" ? " Altered values shown in red." : "") }));
+  }
+  if (f.id === "integrate") {
+    d.push(codeBox(`${c.I.sum.toLocaleString()} / 60 = ${c.I.q} + ${c.I.rem}/60 = ${(c.I.sum / 60).toFixed(3)}…  →  round half up  →  ${c.I.wh} Wh`));
+    d.push(h("div", { class: "text-xs flex flex-wrap items-center gap-2" }, h("span", { class: "text-[var(--muted-foreground)]", text: "Reading:" }), codeBox(`meter_id=${METER}, interval_start=${START}, value_wh=${c.I.wh}, unit=Wh, seq=0`)));
+  }
+  if (f.id === "key") {
+    d.push(h("p", { class: "text-xs text-[var(--muted-foreground)]", text: "Exact canonical bytes hashed:" }), codeBox(keyBytes()));
+    d.push(h("div", { class: "text-xs flex flex-wrap items-center gap-2" }, pill("record_key", "acc"), h("span", { class: "mono break-all", text: "0x" + c.keyHash })));
+  }
+  if (f.id === "digest") {
+    d.push(h("p", { class: "text-xs text-[var(--muted-foreground)]", text: "Exact canonical bytes hashed:" }), codeBox(readingBytes(c.committedWh)));
+    d.push(h("div", { class: "text-xs flex flex-wrap items-center gap-2" }, pill("digest", "ok"), h("span", { class: "mono break-all", text: "0x" + c.commitDigest })));
+  }
+  if (f.id === "manifest") {
+    d.push(codeBox(JSON.stringify({ meter_id: METER, interval_start: START, seq: 0, record_key: "0x" + c.keyHash, digest: "0x" + c.commitDigest }, null, 2)));
+  }
+  if (["prepared", "submitted", "commit"].includes(f.id)) {
+    const at = { prepared: 0, submitted: 1, commit: 2 }[f.id];
+    d.push(h("div", { class: "flex flex-wrap items-center gap-1.5 text-xs" },
+      ["PREPARED", "SUBMITTED", "CONFIRMED"].flatMap((st, k) => [
+        h("span", { class: "px-2.5 py-1 rounded-md border font-semibold " + (k === at ? "border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]" : "border-[var(--card-border)] text-[var(--muted-foreground)]"), text: st }),
+        k < 2 ? h("span", { class: "text-[var(--muted-foreground)]", text: "→" }) : null
+      ]),
+      h("span", { class: "text-[var(--muted-foreground)] ml-1", text: "(or FAILED / UNCERTAIN)" })));
+  }
+  if (f.id === "prepared") {
+    d.push(h("div", { class: "text-xs flex items-center gap-2" }, h("span", { class: "text-[var(--muted-foreground)]", text: "SQLite row:" }), codeBox(`value_wh = ${c.committedWh}`)));
+  }
+  if (f.id === "submitted") {
+    d.push(h("div", { class: "text-xs space-y-1" },
+      h("div", { class: "text-[var(--muted-foreground)]", text: "Signed tx hash (persisted BEFORE broadcast):" }),
+      c.realCommit ? codeBox(REAL_TX.hash) : h("p", { class: "text-[var(--muted-foreground)] italic", text: "Not recorded for this teaching variant (A4 ran on a separate fixture)." })));
+  }
+  if (f.id === "commit") {
+    d.push(h("div", { class: "grid gap-1.5" },
+      [["1", "Caller holds AGGREGATOR_ROLE", "else AccessControlUnauthorizedAccount (A2, S7)"],
+       ["2", "Digest is not zero", "else ZeroDigest"],
+       ["3", "Key never committed before", "else AlreadyCommitted (A3)"]]
+        .map(([num, txt, err]) => h("div", { class: "flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--background)] text-xs" },
+          h("span", { class: "font-bold text-[var(--muted-foreground)] w-4", text: num }),
+          pill("PASS", "ok"),
+          h("span", { class: "font-medium", text: txt }),
+          h("span", { class: "text-[var(--muted-foreground)] ml-auto", text: err })))));
+    d.push(h("p", { class: "text-xs text-[var(--muted-foreground)]", text: c.realCommit
+      ? `Stored: digest, block time, submitter. This reading's real commit used ${REAL_TX.gas.toLocaleString()} gas (median across 72 commits: 72,577) on local Anvil.`
+      : "Stored: digest, block time, submitter. Gas is not shown for this teaching variant." }));
+  }
+  if (f.id === "after") {
+    d.push(h("div", { class: "flex flex-wrap items-center gap-2 text-xs" },
+      h("span", { class: "text-[var(--muted-foreground)]", text: "SQLite row now:" }),
+      c.stored === null ? pill("ROW DELETED", "bad") : codeBox(`value_wh = ${c.stored}`),
+      h("span", { class: "text-[var(--muted-foreground)] ml-2", text: "Registry:" }),
+      pill("unchanged", "ok")));
+  }
+  if (f.id === "audit" || f.id === "verdict") {
+    const ref = c.commitDigest;
+    d.push(h("div", { class: "flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]" },
+      h("span", { text: "Lookup key from manifest:" }),
+      h("span", { class: "mono text-[var(--foreground)]", text: "0x" + c.keyHash.slice(0, 16) + "…" }),
+      pill("expected record key", "acc")));
+    d.push(h("div", { class: "grid grid-cols-1 md:grid-cols-2 gap-2.5" },
+      h("div", { class: "rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-3 space-y-1.5" },
+        h("h4", { class: "text-xs font-semibold text-[var(--muted-foreground)]", text: "Registry (at fixed block)" }),
+        hashWithDiff(ref)),
+      h("div", { class: "rounded-lg border border-[var(--card-border)] bg-[var(--background)] p-3 space-y-1.5" },
+        h("h4", { class: "text-xs font-semibold text-[var(--muted-foreground)]", text: "Recomputed from SQLite row" }),
+        c.stored === null
+          ? pill("no row for this expected key", "warn")
+          : h("div", { class: "space-y-1.5" },
+              h("div", { class: "mono text-[11px] text-[var(--muted-foreground)] break-all", text: readingBytes(c.stored) }),
+              hashWithDiff(c.storedDigest, ref)))));
+  }
+  if (f.id === "audit") {
+    const opts = ["VERIFIED", "TAMPERED", "MISSING_RECORD", "MISSING_COMMITMENT", "MISSING_BOTH", "ERROR"];
+    d.push(h("p", { class: "text-xs text-[var(--muted-foreground)]", text: "Predict the verdict (optional):" }),
+      h("div", { class: "flex flex-wrap gap-1.5" }, opts.map((o) => {
+        const b = h("button", { type: "button", class: "px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors " + (state.prediction === o ? "border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]" : "border-[var(--card-border)] hover:bg-[var(--accent)]"), text: o });
+        b.addEventListener("click", () => { state.prediction = o; renderUI(); });
+        return b;
+      })));
+    if (state.prediction) {
+      const right = state.prediction === c.verdict;
+      d.push(h("div", { class: "rounded-lg px-3 py-2 text-xs font-medium border " + (right ? "bg-[var(--success)]/15 border-[var(--success)]/30 text-[var(--success)]" : "bg-[var(--warning)]/15 border-[var(--warning)]/35 text-[var(--warning)]"), text: right
+        ? `Yes, ${c.verdict}. Press Next for why.`
+        : `Not quite. Hint: compare the two hashes above${c.stored === null ? " and notice which side is missing" : ""}. Press Next to see the answer.` }));
+    }
+  }
+  if (f.id === "verdict") {
+    const tone = verdictTone(c.verdict);
+    const bigStyles = {
+      ok: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40",
+      bad: "bg-[var(--error)]/15 text-[var(--error)] border-[var(--error)]/40",
+      warn: "bg-[var(--warning)]/20 text-[var(--warning)] border-[var(--warning)]/40",
+    };
+    d.push(h("div", { class: "inline-block text-xl font-extrabold px-4 py-2 rounded-xl border " + (bigStyles[tone] || ""), text: c.verdict }));
+    if (c.s === "a1" || c.s === "clean") {
+      const inp = h("input", { type: "number", min: "0", step: "1", value: String(state.tryValue ?? c.stored), "aria-label": "Stored value_wh to test",
+        class: "w-24 px-2 py-1 rounded-md border border-[var(--card-border)] bg-[var(--background)] text-[var(--foreground)] text-xs mono" });
+      const out = h("span", { class: "flex items-center gap-2 flex-wrap" });
+      const upd = () => {
+        const v = Number(inp.value);
+        out.replaceChildren();
+        if (inp.value === "" || !Number.isSafeInteger(v) || v < 0) { out.append(pill("enter a whole number ≥ 0", "info")); return; }
+        state.tryValue = v;
+        const dg = sha256hex(readingBytes(v));
+        out.append(dg === c.commitDigest ? pill("VERIFIED", "ok") : pill("TAMPERED", "bad"), h("span", { class: "mono text-xs text-[var(--muted-foreground)]", text: "0x" + dg.slice(0, 16) + "…" }));
+      };
+      inp.addEventListener("input", upd); upd();
+      d.push(h("div", { class: "flex flex-wrap items-center gap-2 pt-1 text-xs" },
+        h("span", { class: "text-[var(--muted-foreground)]", text: "Try it: set stored value_wh →" }), inp, out));
+      d.push(h("p", { class: "text-xs text-[var(--muted-foreground)]", text: `Each value gets its real SHA-256. Only ${c.committedWh} Wh matches the registry.` }));
+    }
+    if (c.s === "a4") {
+      d.push(h("div", { class: "rounded-lg border-l-4 border-[var(--warning)] bg-[var(--warning)]/12 px-3 py-2 text-xs text-[var(--foreground)]", text: "This is the stated limit of the design (the oracle problem), reported separately from the detection rate. It is not a bug." }));
+    }
+  }
+  return d;
+}
+
+function updateCamGoal() {
+  if (!cam.auto) return;
+  const target = model.frames[state.i].cam;
+  cam.goalTx = target.tx; cam.goalTy = target.ty; cam.goalTz = target.tz;
+  cam.goalYaw = target.yaw; cam.goalPitch = target.pitch; cam.goalDist = state.i === 0 ? fitDistance() : target.dist * (W < 620 ? 1 : 0.80);
+}
+
+function renderUI() {
+  const F = model.frames, f = F[state.i], c = model.ctx;
+  document.getElementById("title").textContent = f.title;
+  document.getElementById("step-tag").textContent = f.tag;
+  document.getElementById("pos").textContent = state.i === 0 ? "Intro" : `Step ${state.i} / ${F.length - 1}`;
+  document.getElementById("hud-pos").textContent = state.i === 0 ? "Intro" : `Step ${state.i}/${F.length - 1}`;
+  document.getElementById("hud-route").textContent = f.nodes.map(id => NODE_DEF.find(n => n.id === id).label).join(" → ") || "Full 3D Pipeline";
+  document.getElementById("explain").textContent = f.explain;
+  document.getElementById("detail").replaceChildren(...detailFor(f, c));
+
+  const hv = document.getElementById("hud-verdict");
+  if (state.i === F.length - 1) {
+    hv.classList.remove("hidden");
+    hv.textContent = "VERDICT: " + c.verdict;
+    const tone = verdictTone(c.verdict);
+    hv.className = "pointer-events-none absolute top-3 right-3 px-3 py-1 rounded-lg font-bold text-xs tracking-wide border " + (
+      tone === "ok" ? "bg-[var(--success)]/20 text-[var(--success)] border-[var(--success)]/45"
+      : tone === "bad" ? "bg-[var(--error)]/20 text-[var(--error)] border-[var(--error)]/45"
+      : "bg-[var(--warning)]/20 text-[var(--warning)] border-[var(--warning)]/45"
+    );
+  } else {
+    hv.classList.add("hidden");
+  }
+
+  const sc = document.getElementById("scrub");
+  sc.max = F.length - 1; sc.value = state.i;
+  document.getElementById("back").disabled = state.i === 0;
+  document.getElementById("next").disabled = state.i === F.length - 1;
+  document.getElementById("play").textContent = state.playing ? "❚❚ Pause" : "▶ Play";
+  document.getElementById("live").textContent = `${f.title}. ${state.i === F.length - 1 ? "Verdict " + c.verdict : ""}`;
+
+  // Scenario chips styling
+  document.querySelectorAll(".scen-chip").forEach((b) => {
+    const on = b.dataset.s === state.s;
+    b.setAttribute("aria-pressed", String(on));
+    b.className = "scen-chip px-3 py-1 rounded-full text-xs font-semibold border transition-colors " + (
+      on ? "bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent"
+         : "border-[var(--card-border)] bg-[var(--card)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+    );
+  });
+
+  syncCameraControls();
+  updateCamGoal();
+}
+
+function go(i) {
+  state.i = Math.max(0, Math.min(model.frames.length - 1, i));
+  if (model.frames[state.i].id !== "audit") {
+    state.prediction = state.prediction && model.frames[state.i].id === "verdict" ? state.prediction : null;
+  }
+  renderUI();
+}
+function stop() { state.playing = false; clearInterval(timer); timer = null; renderUI(); }
+function play() {
+  if (state.i === model.frames.length - 1) state.i = 0;
+  state.playing = true; renderUI();
+  clearInterval(timer);
+  timer = setInterval(() => {
+    go(state.i + 1);
+    if (model.frames[state.i].predict || state.i === model.frames.length - 1) stop();
+  }, 4500);
+}
+function setScenario(s) {
+  clearInterval(timer); timer = null;
+  state = { s, i: state.i, playing: false, prediction: null, tryValue: null };
+  model = buildFrames(s);
+  renderUI();
+}
+
+// Fit the long pipeline to the screen. Portrait plan runs from top to bottom.
+function fitDistance() {
+  const portrait = cam.plan && W < 620;
+  const fitScale = portrait ? Math.min((H - 100) / 800, (W - 80) / 310)
+                           : Math.min(W / 950, H / 390);
+  return Math.min(W, H) * 1.48 / Math.max(0.2, fitScale);
+}
+function resetView(plan) {
+  cam.auto = false;
+  cam.plan = plan;
+  Object.assign(cam, {tx:0, ty:26, tz:0, yaw:plan ? (W < 620 ? Math.PI/2 : 0) : -0.32,
+    pitch:plan ? Math.PI/2 : 0.48, dist:fitDistance()});
+  syncCameraControls();
+}
+function syncCameraControls() {
+  document.getElementById("cam-top").setAttribute("aria-pressed", String(cam.plan));
+  document.getElementById("cam-auto").setAttribute("aria-pressed", String(cam.auto));
+}
+function zoomBy(ratio) {
+  cam.auto = false;
+  cam.dist = Math.max(145, Math.min(3200, cam.dist * ratio));
+  syncCameraControls();
+}
+function panBy(dx, dy) {
+  const scale = Math.min(W,H) * 1.48 / cam.dist;
+  const right = -dx / scale, forward = dy / (scale * Math.max(0.32, Math.sin(cam.pitch)));
+  cam.tx += right * Math.cos(cam.yaw) + forward * Math.sin(cam.yaw);
+  cam.tz += -right * Math.sin(cam.yaw) + forward * Math.cos(cam.yaw);
+}
+const contacts = new Map();
+let tap = null;
+function pair() {
+  const [a,b] = contacts.values();
+  return {x:(a.x+b.x)/2, y:(a.y+b.y)/2, gap:Math.max(4,Math.hypot(a.x-b.x,a.y-b.y))};
+}
+canvas.addEventListener("pointerdown", e => {
+  if (e.button !== 0) return;
+  canvas.setPointerCapture(e.pointerId);
+  contacts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  tap = contacts.size === 1 ? {x:e.clientX,y:e.clientY} : null;
+  cam.dragging = true;
+});
+canvas.addEventListener("pointermove", e => {
+  const old = contacts.get(e.pointerId);
+  if (!old) return;
+  if (tap && Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<5) return;
+  tap = null;
+  const before = contacts.size === 2 ? pair() : null;
+  contacts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  cam.auto = false;
+  if (before) {
+    const after = pair();
+    const rect = canvas.getBoundingClientRect();
+    const cx = rect.left + W/2, cy = rect.top + H*0.52;
+    const prevDist = cam.dist;
+    zoomBy(before.gap/after.gap);
+    const ratio = prevDist/cam.dist;
+    panBy(after.x-cx-(before.x-cx)*ratio,after.y-cy-(before.y-cy)*ratio);
+  } else if (contacts.size === 1) {
+    const dx = e.clientX-old.x, dy = e.clientY-old.y;
+    if (cam.plan || e.shiftKey) panBy(dx,dy);
+    else {cam.yaw += dx*0.006; cam.pitch = Math.max(0.16,Math.min(Math.PI/2,cam.pitch+dy*0.005));} // drag down until looking straight down
+  }
+  syncCameraControls();
+});
+function endPointer(e) {
+  if (!contacts.delete(e.pointerId)) return;
+  if (tap && e.type === "pointerup") {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX-rect.left, y = e.clientY-rect.top;
+    const near = hitTargets.map(t=>({t,d:Math.hypot(x-t.x,y-t.y)})).filter(h=>h.d<=h.t.r).sort((a,b)=>a.d-b.d)[0];
+    if (near) {stop(); cam.auto = !cam.plan; go(near.t.node.step);}
+  }
+  tap = null;
+  cam.dragging = contacts.size > 0;
+}
+for (const event of ["pointerup","pointercancel","lostpointercapture"]) canvas.addEventListener(event,endPointer);
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? H : 1;
+  if(e.shiftKey) {cam.auto=false;panBy(-unit*(e.deltaX || e.deltaY),0);syncCameraControls();}
+  else zoomBy(Math.exp(Math.max(-1,Math.min(1,e.deltaY*unit*(e.ctrlKey?0.009:0.0015)))));
+}, {passive:false});
+document.getElementById("cam-in").onclick = () => zoomBy(0.8);
+document.getElementById("cam-out").onclick = () => zoomBy(1.25);
+document.getElementById("cam-auto").onclick = () => {cam.plan=false;cam.auto=true;renderUI();};
+document.getElementById("cam-iso").onclick = () => resetView(false);
+document.getElementById("cam-top").onclick = () => resetView(true);
+
+document.querySelectorAll(".scen-chip").forEach((b) => b.addEventListener("click", () => setScenario(b.dataset.s)));
+document.getElementById("next").addEventListener("click", () => { stop(); go(state.i + 1); });
+document.getElementById("back").addEventListener("click", () => { stop(); go(state.i - 1); });
+document.getElementById("restart").addEventListener("click", () => { stop(); go(0); });
+document.getElementById("play").addEventListener("click", () => (state.playing ? stop() : play()));
+document.getElementById("scrub").addEventListener("input", (e) => { stop(); go(Number(e.target.value)); });
+document.addEventListener("keydown", (e) => {
+  if (!SELF_TEST || e.altKey || e.ctrlKey || e.metaKey || e.target.tagName === "INPUT" || (e.key === " " && e.target.closest("button"))) return;
+  if (e.key === "ArrowRight") { stop(); go(state.i + 1); }
+  else if (e.key === "ArrowLeft") { stop(); go(state.i - 1); }
+  else if (e.key === " ") { e.preventDefault(); state.playing ? stop() : play(); }
+  else if (e.key.toLowerCase() === "r") { stop(); go(0); }
+  else if (["1", "2", "3", "4"].includes(e.key)) setScenario(["clean", "a1", "s5", "a4"][Number(e.key) - 1]);
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden && state.playing) stop(); });
+
+document.getElementById("foot").textContent =
+  "Data: AMPds2 Electricity_WHE.csv (Makonin et al.), hour 2012-04-01 07:00 UTC. Hashes recomputed in-page with FIPS 180-4 SHA-256 and self-verified against pipeline/smart_meter/fingerprint.py and docs/evidence/2026-11-14-final/run-1/. Keys: ← → step · Space play · R restart · 1–4 scenario.";
+
+// Deep link support (#a1-11)
+(() => {
+  const m = location.hash.match(/^#(clean|a1|s5|a4)(?:-(\d+))?$/);
+  if (!m) return;
+  setScenario(m[1]);
+  if (m[2]) state.i = Math.max(0, Math.min(model.frames.length - 1, Number(m[2]) - 1));
+})();
+
+window.addEventListener("resize", () => {resizeCanvas(); if(cam.plan) resetView(true); else updateCamGoal();});
+window.addEventListener("themechange", syncTheme);
+(() => {
+  const root = document.documentElement;
+  const apply = (t) => { if (t === "light") root.dataset.theme = "light"; else delete root.dataset.theme; syncTheme(); };
+  try { const saved = localStorage.getItem("explainer-theme"); if (saved) apply(saved); } catch (_) {}
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const next = root.dataset.theme === "light" ? "dark" : "light";
+    apply(next);
+    try { localStorage.setItem("explainer-theme", next); } catch (_) {}
+  });
+})();
+
+if (!SELF_TEST) {
+  document.querySelectorAll("button,input").forEach(el => el.disabled = true);
+  document.getElementById("stage").replaceChildren(h("div", { class: "p-3 rounded-lg bg-[var(--error)]/15 text-[var(--error)] text-sm font-semibold", text: "Self-test failed: this page's SHA-256 does not reproduce the project's hashes. Do not present it." }));
+} else {
+  syncTheme();
+  resizeCanvas();
+  cam.dist = fitDistance();
+  renderUI();
+  requestAnimationFrame(render3D);
+}
+</script>
+</body>
+</html>
